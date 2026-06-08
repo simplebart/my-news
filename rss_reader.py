@@ -196,7 +196,7 @@ def relative_time(pub_raw):
         if h < 24: return f"{h} uur"
         d = h//24
         return "gisteren" if d==1 else f"{d} dagen"
-    except: return ""
+    except: return "?"
 
 def is_recent(pub_raw, hours=2):
     try:
@@ -483,3 +483,4 @@ elif st.session_state.page == "settings":
             st.markdown("**⚠️ Feed fouten**")
             for src, err in feed_errors.items():
                 st.markdown(f"<div class='feed-error'>· {src}: verbinding mislukt</div>", unsafe_allow_html=True)
+            
