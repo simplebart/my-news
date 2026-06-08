@@ -291,10 +291,24 @@ if not st.session_state.show_dupes:
 
 sorted_all = sorted(all_articles, key=sort_key, reverse=True)
 
+# Pre-fetch OG images for articles without one
+def prefetch_images(articles):
+    urls_needed = [(i, a) for i, a in enumerate(articles) if not a.get("img") and a.get("link")]
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        futures = {ex.submit(get_og_image, a["link"]): i for i, a in urls_needed}
+        for future in as_completed(futures):
+            idx = futures[future]
+            articles[idx]["img"] = future.result()
+    return articles
+
+all_articles = prefetch_images(all_articles)
+sorted_all = sorted(all_articles, key=sort_key, reverse=True)
+for t in topic_articles:
+    topic_articles[t] = prefetch_images(topic_articles[t])
+    topic_articles[t] = sorted(topic_articles[t], key=sort_key, reverse=True)
+
 def get_img(a, cls="news-thumb"):
-    img_url = a.get("img","")
-    if not img_url and a.get("link"): img_url = get_og_image(a["link"])
-    return thumb_html(img_url, cls)
+    return thumb_html(a.get("img",""), cls)
 
 def render_news_card(a):
     summary = esc(a["summary"][:130])+"…" if len(a.get("summary",""))>130 else esc(a.get("summary",""))
