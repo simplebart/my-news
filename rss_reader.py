@@ -109,26 +109,27 @@ TOPICS = {
     "💹 Financiën & Markten": {
         "FT Markets":      "https://www.ft.com/markets?format=rss",
         "FT":              "https://www.ft.com/rss/home",
-        "Reuters Business":"https://feeds.reuters.com/reuters/businessNews",
-        "Investing.com":   "https://investing.com/rss/news.rss",
         "Yahoo Finance":   "https://finance.yahoo.com/news/rss",
         "Business Insider":"https://feeds.businessinsider.com/custom/all",
+        "Investing.com":   "https://investing.com/rss/news.rss",
+        "CNBC Finance":    "https://www.cnbc.com/id/10000664/device/rss/rss.html",
     },
     "🌐 Geopolitiek": {
-        "Reuters World":   "https://feeds.reuters.com/reuters/worldNews",
         "BBC World":       "http://feeds.bbci.co.uk/news/world/rss.xml",
         "Politico Europe": "https://www.politico.eu/feed/",
-        "Foreign Affairs": "https://www.foreignaffairs.com/rss.xml",
+        "AP News World":   "https://apnews.com/rss/apf-topnews",
+        "Al Jazeera":      "https://www.aljazeera.com/xml/rss/all.xml",
     },
     "💻 Tech & AI": {
         "The Verge":       "https://www.theverge.com/rss/index.xml",
+        "Ars Technica":    "http://feeds.arstechnica.com/arstechnica/index",
         "FT Tech":         "https://www.ft.com/technology?format=rss",
     },
     "📊 Economics": {
-        "The Economist":    "https://www.economist.com/rss.xml",
-        "Reuters Economy":  "https://feeds.reuters.com/reuters/economicsnews",
         "BBC Business":     "http://feeds.bbci.co.uk/news/business/rss.xml",
         "Euronews Business":"https://www.euronews.com/rss?format=mrss&level=vertical&name=business",
+        "CNBC Economy":     "https://www.cnbc.com/id/20910258/device/rss/rss.html",
+        "IMF News":         "https://www.imf.org/en/News/rss?language=eng",
     },
 }
 
