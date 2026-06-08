@@ -8,7 +8,10 @@ from email.utils import parsedate_to_datetime
 from datetime import datetime, timezone, timedelta
 from collections import defaultdict
 
-os.environ.setdefault("GEMINI_API_KEY", "JOUW_KEY_HIER")
+try:
+    os.environ["GEMINI_API_KEY"] = st.secrets["GEMINI_API_KEY"]
+except Exception:
+    os.environ.setdefault("GEMINI_API_KEY", "JOUW_KEY_HIER")
 
 st.set_page_config(page_title="My News", layout="wide", page_icon="🗞️")
 
@@ -333,44 +336,29 @@ def fetch(source, url):
     except Exception:
         return []
 
-# ── Sidebar ───────────────────────────────────────────────────────────────────
-with st.sidebar:
-    st.markdown("""
-    <div style='padding:16px 0 8px 0'>
-        <div style='font-size:22px;font-weight:800;color:#f0f6ff;letter-spacing:-0.5px'>🗞️ My News</div>
-        <div style='font-size:11px;color:#334155;margin-top:2px'>Persoonlijk nieuwsoverzicht</div>
-    </div>
-    """, unsafe_allow_html=True)
-    st.markdown("<hr style='border:none;border-top:1px solid #1a2744;margin:8px 0 16px 0'>", unsafe_allow_html=True)
+# ── Settings via session state ───────────────────────────────────────────────
+if "active_topics" not in st.session_state:
+    st.session_state.active_topics = {t: True for t in TOPICS}
+if "custom_name" not in st.session_state:
+    st.session_state.custom_name = ""
+if "custom_url" not in st.session_state:
+    st.session_state.custom_url = ""
+if "max_items" not in st.session_state:
+    st.session_state.max_items = 5
+if "keywords" not in st.session_state:
+    st.session_state.keywords = []
+if "show_dupes" not in st.session_state:
+    st.session_state.show_dupes = False
 
-    if st.button("🔄 Vernieuwen", use_container_width=True):
-        st.cache_data.clear()
-        st.rerun()
+active_topics = st.session_state.active_topics
+custom_name   = st.session_state.custom_name
+custom_url    = st.session_state.custom_url
+max_items     = st.session_state.max_items
+keywords      = st.session_state.keywords
+show_dupes    = st.session_state.show_dupes
 
-    st.markdown("<hr style='border:none;border-top:1px solid #1a2744;margin:16px 0'>", unsafe_allow_html=True)
-    st.markdown("<div style='font-size:10px;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px'>📡 Onderwerpen</div>", unsafe_allow_html=True)
-    active_topics = {}
-    for topic, feeds in TOPICS.items():
-        checked = st.checkbox(topic, value=True)
-        active_topics[topic] = checked
-        if checked:
-            with st.expander("bronnen", expanded=False):
-                for src in feeds:
-                    st.markdown(f"<span style='color:#4a6080;font-size:11px'>· {src}</span>", unsafe_allow_html=True)
-
-    st.markdown("<hr style='border:none;border-top:1px solid #1a2744;margin:16px 0'>", unsafe_allow_html=True)
-    st.markdown("<div style='font-size:10px;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px'>➕ Eigen bron</div>", unsafe_allow_html=True)
-    custom_name = st.text_input("Naam", placeholder="bijv. FD.nl")
-    custom_url  = st.text_input("RSS URL", placeholder="https://...")
-    max_items   = st.slider("Artikelen per bron", 3, 10, 5)
-
-    st.markdown("<hr style='border:none;border-top:1px solid #1a2744;margin:16px 0'>", unsafe_allow_html=True)
-    st.markdown("<div style='font-size:10px;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px'>🏷️ Trefwoorden</div>", unsafe_allow_html=True)
-    kw_input = st.text_input("Komma-gescheiden", placeholder="bijv. AI, ECB, rente…")
-    keywords = [k.strip() for k in kw_input.split(",") if k.strip()] if kw_input else []
-
-    st.markdown("<hr style='border:none;border-top:1px solid #1a2744;margin:16px 0'>", unsafe_allow_html=True)
-    show_dupes = st.toggle("Duplicaten tonen", value=False)
+# Hide sidebar completely
+st.markdown("<style>div[data-testid='stSidebar']{display:none}</style>", unsafe_allow_html=True)
 
 # ── Data laden ────────────────────────────────────────────────────────────────
 all_articles = []
@@ -485,7 +473,7 @@ def render_tl_card(a, prefix="t"):
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
 saved_count = len(st.session_state.saved)
-tab1, tab2, tab3, tab4 = st.tabs(["📂 Per onderwerp", "⏱️ Tijdlijn", "🏷️ Trefwoorden", f"🔖 Opgeslagen ({saved_count})"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📂 Per onderwerp", "⏱️ Tijdlijn", "🏷️ Trefwoorden", f"🔖 Opgeslagen ({saved_count})", "⚙️ Instellingen"])
 
 with tab1:
     for topic, arts in topic_articles.items():
@@ -523,3 +511,41 @@ with tab4:
             st.rerun()
         for si, a in enumerate(st.session_state.saved.values()):
             render_tl_card(a, prefix=f"tab4_{si}")
+
+with tab5:
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    col1, col2 = st.columns([1, 1])
+
+    with col1:
+        st.markdown("#### 📡 Onderwerpen")
+        new_active = {}
+        for topic, feeds in TOPICS.items():
+            checked = st.checkbox(topic, value=st.session_state.active_topics.get(topic, True), key=f"set_{topic}")
+            new_active[topic] = checked
+            if checked:
+                with st.expander("Bronnen", expanded=False):
+                    for src in feeds:
+                        st.markdown(f"<span style='color:#5a7a9a;font-size:12px'>· {src}</span>", unsafe_allow_html=True)
+        st.session_state.active_topics = new_active
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("#### 🔁 Overig")
+        st.session_state.show_dupes = st.toggle("Duplicaten tonen", value=st.session_state.show_dupes, key="set_dupes")
+        st.session_state.max_items = st.slider("Artikelen per bron", 3, 10, st.session_state.max_items, key="set_max")
+
+    with col2:
+        st.markdown("#### 🏷️ Trefwoorden volgen")
+        kw_str = ", ".join(st.session_state.keywords)
+        kw_input = st.text_input("Komma-gescheiden", value=kw_str, placeholder="bijv. AI, ECB, rente…", key="set_kw")
+        st.session_state.keywords = [k.strip() for k in kw_input.split(",") if k.strip()] if kw_input else []
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("#### ➕ Eigen bron toevoegen")
+        st.session_state.custom_name = st.text_input("Naam", value=st.session_state.custom_name, placeholder="bijv. FD.nl", key="set_cname")
+        st.session_state.custom_url  = st.text_input("RSS URL", value=st.session_state.custom_url, placeholder="https://...", key="set_curl")
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("🔄 Feeds vernieuwen", use_container_width=True):
+            st.cache_data.clear()
+            st.rerun()
