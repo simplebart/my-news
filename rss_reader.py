@@ -349,6 +349,8 @@ if "keywords" not in st.session_state:
     st.session_state.keywords = []
 if "show_dupes" not in st.session_state:
     st.session_state.show_dupes = False
+if "active_category" not in st.session_state:
+    st.session_state.active_category = list(TOPICS.keys())[0]
 
 active_topics = st.session_state.active_topics
 custom_name   = st.session_state.custom_name
@@ -364,18 +366,28 @@ with st.sidebar:
         <div style='font-size:20px;font-weight:800;color:#f0f6ff;letter-spacing:-0.5px'>🗞️ My News</div>
     </div>
     """, unsafe_allow_html=True)
-    st.markdown("<hr style='border:none;border-top:1px solid #1a2744;margin:0 0 12px 0'>", unsafe_allow_html=True)
-
+    st.markdown("<hr style='border:none;border-top:1px solid #1a2744;margin:0 0 16px 0'>", unsafe_allow_html=True)
     st.markdown("<div style='font-size:10px;font-weight:700;color:#2a3d5a;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px'>Categorieën</div>", unsafe_allow_html=True)
+
     for topic in TOPICS:
-        emoji = topic.split()[0]
-        name  = " ".join(topic.split()[1:])
-        active = st.session_state.active_topics.get(topic, True)
-        color = "#5a9fd8" if active else "#2a3d5a"
-        st.markdown(f"<div style='padding:6px 10px;border-radius:8px;margin-bottom:4px;background:#0e1a2d;border:1px solid #111e35'><span style='font-size:13px;color:{color};font-weight:500'>{emoji} {name}</span></div>", unsafe_allow_html=True)
+        if not st.session_state.active_topics.get(topic, True):
+            continue
+        is_active = st.session_state.active_category == topic
+        bg = "#1a3a6b" if is_active else "#0e1a2d"
+        border = "#2563eb" if is_active else "#111e35"
+        color = "#c8e0ff" if is_active else "#5a7a9a"
+        if st.button(topic, key=f"nav_{topic}", use_container_width=True):
+            st.session_state.active_category = topic
+            st.rerun()
+        # Style the last button
+        st.markdown(f"""<style>
+        div[data-testid="stSidebar"] div[data-testid="stButton"]:has(button[kind="secondary"]) button {{
+            text-align: left !important;
+        }}
+        </style>""", unsafe_allow_html=True)
 
     st.markdown("<hr style='border:none;border-top:1px solid #1a2744;margin:16px 0 12px 0'>", unsafe_allow_html=True)
-    if st.button("🔄 Vernieuwen", use_container_width=True):
+    if st.button("🔄 Vernieuwen", use_container_width=True, key="refresh_btn"):
         st.cache_data.clear()
         st.rerun()
 
@@ -495,10 +507,12 @@ saved_count = len(st.session_state.saved)
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["📂 Per onderwerp", "⏱️ Tijdlijn", "🏷️ Trefwoorden", f"🔖 Opgeslagen ({saved_count})", "⚙️ Instellingen"])
 
 with tab1:
-    for topic, arts in topic_articles.items():
-        if not arts:
-            continue
-        st.markdown(f'<div class="topic-header">{topic}</div>', unsafe_allow_html=True)
+    active_cat = st.session_state.active_category
+    arts = topic_articles.get(active_cat, [])
+    st.markdown(f'<div class="topic-header">{active_cat}</div>', unsafe_allow_html=True)
+    if not arts:
+        st.info("Geen artikelen gevonden voor deze categorie.")
+    else:
         cols = st.columns(3)
         for j, a in enumerate(arts):
             with cols[j % 3]:
