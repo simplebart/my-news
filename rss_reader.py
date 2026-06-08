@@ -371,7 +371,7 @@ for t in topic_articles:
 def get_img(a, cls="news-thumb"):
     return thumb_html(a.get("img",""), cls)
 
-def render_news_card(a, prefix="n", show_source_btn=True):
+def render_news_card(a, prefix="n"):
     summary = esc(a["summary"][:130])+"…" if len(a.get("summary",""))>130 else esc(a.get("summary",""))
     th = get_img(a, "news-thumb")
     st.markdown(f'''<div class="news-card">
@@ -380,11 +380,7 @@ def render_news_card(a, prefix="n", show_source_btn=True):
             <a class="news-title" href="{esc(a["link"])}" target="_blank">{esc(a["title"])}</a>
             <div class="news-summary">{summary}</div>
         </div>{th}</div>''', unsafe_allow_html=True)
-    if show_source_btn:
-        if st.button(f"📰 Meer van {esc(a['source'])}", key=f"{prefix}_src_{a['id']}"):
-            st.session_state.page = "source"
-            st.session_state.active_source = a["source"]
-            st.rerun()
+
 
 def render_mini_card(a):
     th = get_img(a, "mini-thumb")
@@ -492,7 +488,7 @@ elif st.session_state.page == "source":
     st.markdown(f'<div style="font-size:24px;font-weight:800;color:#f0f6ff;padding:8px 0 4px 0">{esc(src)}</div>', unsafe_allow_html=True)
     st.markdown(f'<div style="font-size:12px;color:#2a3d5a;margin-bottom:16px">{len(arts)} artikelen</div>', unsafe_allow_html=True)
     for j, a in enumerate(arts):
-        render_news_card(a, prefix=f"src_{j}", show_source_btn=False)
+        render_news_card(a, prefix=f"src_{j}")
 
 elif st.session_state.page == "settings":
     if st.button("← Terug naar home", key="back_settings"):
