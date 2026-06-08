@@ -149,7 +149,7 @@ TOPICS = {
     },
 }
 
-for key, val in [("saved", {}), ("read", set()), ("page", "home"), ("active_category", ""),
+for key, val in [("page", "home"), ("active_category", ""),
                  ("active_topics", {t: True for t in TOPICS}), ("custom_name", ""),
                  ("custom_url", ""), ("max_items", 8), ("keywords", []), ("show_dupes", False)]:
     if key not in st.session_state: st.session_state[key] = val
@@ -283,10 +283,6 @@ sorted_all = sorted(all_articles, key=sort_key, reverse=True)
 
 def render_news_card(a, prefix="n"):
     aid = a["id"]
-    is_read = aid in st.session_state.read
-    is_saved = aid in st.session_state.saved
-    dim = " dimmed" if is_read else ""
-    saved_html = ' <span style="color:#2e8b2e;font-size:10px">🔖</span>' if is_saved else ""
     summary = esc(a["summary"][:130]) + ("…" if len(a["summary"]) > 130 else "") if a.get("summary") else ""
     img_url = a.get("img","")
     if not img_url and a.get("link"):
@@ -294,22 +290,11 @@ def render_news_card(a, prefix="n"):
     th = thumb_html(img_url, "news-thumb")
     html = f'''<div class="news-card">
         <div class="news-card-body">
-            <div class="news-source">{esc(a["source"])} · {esc(a["date"])}{saved_html}</div>
+            <div class="news-source">{esc(a["source"])} · {esc(a["date"])}</div>
             <a class="news-title{dim}" href="{esc(a["link"])}" target="_blank">{esc(a["title"])}</a>
             <div class="news-summary">{summary}</div>
         </div>{th}</div>'''
     st.markdown(html, unsafe_allow_html=True)
-    c1, c2 = st.columns(2)
-    with c1:
-        if st.button("✅" if is_saved else "🔖", key=f"{prefix}_s_{aid}"):
-            if is_saved: del st.session_state.saved[aid]
-            else: st.session_state.saved[aid] = a
-            st.rerun()
-    with c2:
-        if st.button("↩" if is_read else "👁", key=f"{prefix}_r_{aid}"):
-            if is_read: st.session_state.read.discard(aid)
-            else: st.session_state.read.add(aid)
-            st.rerun()
 
 def render_mini_card(a):
     th = thumb_html(a.get("img",""), "mini-thumb")
