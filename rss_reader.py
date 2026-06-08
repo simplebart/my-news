@@ -291,7 +291,7 @@ def render_news_card(a, prefix="n"):
     html = f'''<div class="news-card">
         <div class="news-card-body">
             <div class="news-source">{esc(a["source"])} · {esc(a["date"])}</div>
-            <a class="news-title{dim}" href="{esc(a["link"])}" target="_blank">{esc(a["title"])}</a>
+            <a class="news-title" href="{esc(a["link"])}" target="_blank">{esc(a["title"])}</a>
             <div class="news-summary">{summary}</div>
         </div>{th}</div>'''
     st.markdown(html, unsafe_allow_html=True)
