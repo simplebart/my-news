@@ -81,6 +81,10 @@ div[data-testid="stTextInput"] input {
     padding: 14px 0; border-bottom: 1px solid #0f1e35;
 }
 .news-card:hover .news-title { color: #ccddee !important; }
+a.news-title { color: #ffffff !important; text-decoration: none !important; }
+a.mini-title { color: #e8eaf0 !important; text-decoration: none !important; }
+a.breaking-title { color: #ffffff !important; text-decoration: none !important; }
+a { color: inherit !important; }
 .news-card-body { flex: 1; min-width: 0; }
 .news-source { font-size: 10px; font-weight: 700; color: #888ea8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
 .news-title { font-size: 15px; font-weight: 700; color: #ffffff; line-height: 1.4; margin-bottom: 4px; text-decoration: none; display: block; transition: color 0.15s; }
