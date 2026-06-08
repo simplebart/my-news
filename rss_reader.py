@@ -303,13 +303,6 @@ with st.sidebar:
         if st.button(topic, key=f"nav_{topic}", use_container_width=True):
             st.session_state.page="category"; st.session_state.active_category=topic; st.rerun()
     st.markdown("<hr style='border:none;border-top:1px solid #111e35;margin:12px 0'>", unsafe_allow_html=True)
-    st.markdown("<div style='font-size:10px;font-weight:700;color:#1e3050;text-transform:uppercase;letter-spacing:1px;margin:12px 0 8px 0'>Bronnen</div>", unsafe_allow_html=True)
-    all_sources = sorted(set(a["source"] for a in all_articles))
-    for src in all_sources:
-        if st.button(src, key=f"src_nav_{src}", use_container_width=True):
-            st.session_state.page = "source"
-            st.session_state.active_source = src
-            st.rerun()
     st.markdown("<hr style='border:none;border-top:1px solid #111e35;margin:12px 0'>", unsafe_allow_html=True)
     if st.button("⚙️ Instellingen", use_container_width=True, key="nav_settings"):
         st.session_state.page="settings"; st.rerun()
@@ -350,6 +343,15 @@ if not st.session_state.show_dupes:
 
 sorted_all = sorted(all_articles, key=sort_key, reverse=True)
 
+# Bronnen sidebar - na laden
+with st.sidebar:
+    st.markdown("<div style='font-size:10px;font-weight:700;color:#1e3050;text-transform:uppercase;letter-spacing:1px;margin:0 0 8px 0'>Bronnen</div>", unsafe_allow_html=True)
+    for src in sorted(set(a["source"] for a in all_articles)):
+        if st.button(src, key=f"src_nav_{src}", use_container_width=True):
+            st.session_state.page = "source"
+            st.session_state.active_source = src
+            st.rerun()
+
 # Pre-fetch OG images for articles without one
 def prefetch_images(articles):
     urls_needed = [(i, a) for i, a in enumerate(articles) if not a.get("img") and a.get("link")]
@@ -362,6 +364,15 @@ def prefetch_images(articles):
 
 all_articles = prefetch_images(all_articles)
 sorted_all = sorted(all_articles, key=sort_key, reverse=True)
+
+# Bronnen sidebar - na laden
+with st.sidebar:
+    st.markdown("<div style='font-size:10px;font-weight:700;color:#1e3050;text-transform:uppercase;letter-spacing:1px;margin:0 0 8px 0'>Bronnen</div>", unsafe_allow_html=True)
+    for src in sorted(set(a["source"] for a in all_articles)):
+        if st.button(src, key=f"src_nav_{src}", use_container_width=True):
+            st.session_state.page = "source"
+            st.session_state.active_source = src
+            st.rerun()
 for t in topic_articles:
     topic_articles[t] = prefetch_images(topic_articles[t])
     topic_articles[t] = sorted(topic_articles[t], key=sort_key, reverse=True)
