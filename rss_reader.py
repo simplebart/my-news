@@ -118,7 +118,6 @@ TOPICS = {
         "BBC World":       "http://feeds.bbci.co.uk/news/world/rss.xml",
         "Politico Europe": "https://www.politico.eu/feed/",
         "AP News World":   "https://apnews.com/rss/apf-topnews",
-        "Al Jazeera":      "https://www.aljazeera.com/xml/rss/all.xml",
     },
     "💻 Tech & AI": {
         "The Verge":       "https://www.theverge.com/rss/index.xml",
@@ -329,9 +328,11 @@ if st.session_state.page == "home":
             for src, err in feed_errors.items():
                 st.markdown(f'<div class="feed-error">· {src}</div>', unsafe_allow_html=True)
 
-    # Breaking News — filter op laatste 2 uur, anders meest recent
-    recent = [a for a in sorted_all if is_recent(a["pub_raw"], hours=2)]
-    breaking_art = recent[0] if recent else (sorted_all[0] if sorted_all else None)
+    # Breaking News — alleen BBC, FT en AP, laatste 2 uur anders meest recent
+    BREAKING_SOURCES = ["BBC World", "BBC Business", "FT", "FT Markets", "FT Tech", "AP News World"]
+    trusted = [a for a in sorted_all if a["source"] in BREAKING_SOURCES]
+    recent = [a for a in trusted if is_recent(a["pub_raw"], hours=2)]
+    breaking_art = recent[0] if recent else (trusted[0] if trusted else (sorted_all[0] if sorted_all else None))
 
     if breaking_art:
         a = breaking_art
@@ -430,3 +431,4 @@ elif st.session_state.page == "settings":
             st.markdown("**⚠️ Feed fouten**")
             for src, err in feed_errors.items():
                 st.markdown(f"<div class='feed-error'>· {src}: verbinding mislukt</div>", unsafe_allow_html=True)
+            
