@@ -124,7 +124,7 @@ TOPICS = {
     },
     "📊 Economics": {
         "BBC Business":     "http://feeds.bbci.co.uk/news/business/rss.xml",
-        "Euronews Business":"https://www.euronews.com/rss?format=mrss&level=vertical&name=business",
+        "VoxEU":           "https://cepr.org/rss.xml",
         "IMF News":         "https://www.imf.org/en/News/rss?language=eng",
     },
 }
