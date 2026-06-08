@@ -113,40 +113,41 @@ div[data-testid="stTextInput"] input:focus {
 
 /* ── Artikel kaart ── */
 .card-wrap {
-    background: #0e1a2d;
-    border: 1px solid #111e35;
-    border-radius: 12px;
-    overflow: hidden;
-    margin-bottom: 14px;
-    transition: border-color 0.15s, box-shadow 0.15s;
-    height: 220px;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid #111e35;
+    border-radius: 0;
+    padding: 12px 0;
+    margin-bottom: 0;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 12px;
+    transition: background 0.15s;
 }
-.card-wrap:hover {
-    border-color: #2563eb;
-    box-shadow: 0 4px 20px #00000044;
-}
+.card-wrap:hover { background: #0e1a2d44; }
 .card-body {
-    padding: 14px 16px 12px 16px;
-    display: flex;
-    flex-direction: column;
     flex: 1;
-    overflow: hidden;
+    min-width: 0;
+    padding: 0;
 }
 .card-summary {
-    font-size: 11px; color: #7a9cc0; line-height: 1.5;
-    flex: 1;
+    font-size: 12px; color: #5a7a9a; line-height: 1.5;
     overflow: hidden;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
+    margin-bottom: 4px;
 }
 .card-footer-row {
-    display: flex; align-items: center;
-    border-top: 1px solid #1a2e45;
-    padding-top: 8px;
-    margin-top: 8px;
+    display: flex; align-items: center; gap: 8px;
+    margin-top: 4px;
+}
+.card-thumb {
+    width: 80px; height: 60px;
+    object-fit: cover;
+    border-radius: 8px;
+    flex-shrink: 0;
 }
 
 /* Gelijke kolomhoogte */
@@ -570,10 +571,8 @@ with tab1:
             st.session_state[cat_key] = 12
         show_n = st.session_state[cat_key]
         visible = arts[:show_n]
-        cols = st.columns(3)
         for j, a in enumerate(visible):
-            with cols[j % 3]:
-                render_card(a, prefix=f"tab1_{j}")
+            render_card(a, prefix=f"tab1_{j}")
         if show_n < len(arts):
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button(f"Laad meer ({len(arts) - show_n} resterend)", use_container_width=True):
