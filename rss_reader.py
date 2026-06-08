@@ -376,6 +376,12 @@ def render_mini_card(a):
 
 # ── PAGINA'S ──────────────────────────────────────────────────────────────────
 if st.session_state.page == "home":
+    # DEBUG - tijdelijk
+    with st.expander("🐛 Debug datums", expanded=False):
+        for a in all_articles:
+            if a["source"] in ["Business Insider", "The Verge", "Yahoo Finance"]:
+                st.text(f"{a['source']}: raw={repr(a['pub_raw'])} → parsed={repr(a['date'])}")
+                break
     st.markdown(f'<div style="font-size:26px;font-weight:800;color:#f0f6ff;padding:16px 0 4px 0;letter-spacing:-0.5px">🗞️ My News</div>', unsafe_allow_html=True)
     st.markdown(f'<div style="font-size:12px;color:#2a3d5a;margin-bottom:20px">{datetime.now().strftime("%A %d %B %Y, %H:%M")}</div>', unsafe_allow_html=True)
 
