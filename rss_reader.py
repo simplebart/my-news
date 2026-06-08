@@ -134,7 +134,7 @@ div[data-testid="stMarkdownContainer"] a { color: #ffffff !important; }
 
 TOPICS = {
     "💹 Financiën & Markten": {
-        "CNBC Finance":    "https://www.cnbc.com/id/10000664/device/rss/rss.html",
+        "FT Markets":      "https://www.ft.com/markets?format=rss",
         "Reuters Business":"https://feeds.reuters.com/reuters/businessNews",
         "Investing.com":   "https://investing.com/rss/news.rss",
         "Yahoo Finance":   "https://finance.yahoo.com/news/rss",
@@ -153,8 +153,8 @@ TOPICS = {
     },
     "📊 Economics": {
         "The Economist":    "https://www.economist.com/rss.xml",
-        "BBC Business":     "http://feeds.bbci.co.uk/news/business/rss.xml",
-        "Euronews Business":"https://www.euronews.com/rss?format=mrss&level=vertical&name=business",
+        "Reuters Economy":  "https://feeds.reuters.com/reuters/economicsnews",
+        "Reuters World":    "https://feeds.reuters.com/reuters/worldNews",
     },
 }
 
