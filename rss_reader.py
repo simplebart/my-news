@@ -357,8 +357,27 @@ max_items     = st.session_state.max_items
 keywords      = st.session_state.keywords
 show_dupes    = st.session_state.show_dupes
 
-# Hide sidebar completely
-st.markdown("<style>div[data-testid='stSidebar']{display:none}</style>", unsafe_allow_html=True)
+# ── Sidebar ───────────────────────────────────────────────────────────────────
+with st.sidebar:
+    st.markdown("""
+    <div style='padding:16px 0 12px 0'>
+        <div style='font-size:20px;font-weight:800;color:#f0f6ff;letter-spacing:-0.5px'>🗞️ My News</div>
+    </div>
+    """, unsafe_allow_html=True)
+    st.markdown("<hr style='border:none;border-top:1px solid #1a2744;margin:0 0 12px 0'>", unsafe_allow_html=True)
+
+    st.markdown("<div style='font-size:10px;font-weight:700;color:#2a3d5a;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px'>Categorieën</div>", unsafe_allow_html=True)
+    for topic in TOPICS:
+        emoji = topic.split()[0]
+        name  = " ".join(topic.split()[1:])
+        active = st.session_state.active_topics.get(topic, True)
+        color = "#5a9fd8" if active else "#2a3d5a"
+        st.markdown(f"<div style='padding:6px 10px;border-radius:8px;margin-bottom:4px;background:#0e1a2d;border:1px solid #111e35'><span style='font-size:13px;color:{color};font-weight:500'>{emoji} {name}</span></div>", unsafe_allow_html=True)
+
+    st.markdown("<hr style='border:none;border-top:1px solid #1a2744;margin:16px 0 12px 0'>", unsafe_allow_html=True)
+    if st.button("🔄 Vernieuwen", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
 
 # ── Data laden ────────────────────────────────────────────────────────────────
 all_articles = []
