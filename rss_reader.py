@@ -117,7 +117,7 @@ div[data-testid="stTextInput"] input:focus {
     border: 1px solid #111e35;
     border-radius: 14px;
     overflow: hidden;
-    margin-bottom: 14px;
+    margin-bottom: 24px;
     transition: border-color 0.15s, box-shadow 0.15s;
     display: flex;
     flex-direction: column;
@@ -128,7 +128,7 @@ div[data-testid="stTextInput"] input:focus {
     box-shadow: 0 4px 24px #0008;
 }
 .card-body {
-    padding: 14px 16px 10px 16px;
+    padding: 18px 20px 14px 20px;
     display: flex;
     flex-direction: column;
     flex: 1;
@@ -556,8 +556,20 @@ with tab1:
     if not arts:
         st.info("Geen artikelen gevonden voor deze categorie.")
     else:
-        for j, a in enumerate(arts):
-            render_card(a, prefix=f"tab1_{j}")
+        cat_key = f"show_count_{st.session_state.active_category}"
+        if cat_key not in st.session_state:
+            st.session_state[cat_key] = 3
+        show_n = st.session_state[cat_key]
+        visible = arts[:show_n]
+        cols = st.columns(2)
+        for j, a in enumerate(visible):
+            with cols[j % 2]:
+                render_card(a, prefix=f"tab1_{j}")
+        if show_n < len(arts):
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button(f"Laad meer ({len(arts) - show_n} resterend)", use_container_width=True):
+                st.session_state[cat_key] += 4
+                st.rerun()
 
 with tab2:
     st.markdown("<br>", unsafe_allow_html=True)
