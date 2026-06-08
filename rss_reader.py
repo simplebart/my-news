@@ -558,17 +558,17 @@ with tab1:
     else:
         cat_key = f"show_count_{st.session_state.active_category}"
         if cat_key not in st.session_state:
-            st.session_state[cat_key] = 3
+            st.session_state[cat_key] = 12
         show_n = st.session_state[cat_key]
         visible = arts[:show_n]
-        cols = st.columns(2)
+        cols = st.columns(3)
         for j, a in enumerate(visible):
-            with cols[j % 2]:
+            with cols[j % 3]:
                 render_card(a, prefix=f"tab1_{j}")
         if show_n < len(arts):
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button(f"Laad meer ({len(arts) - show_n} resterend)", use_container_width=True):
-                st.session_state[cat_key] += 4
+                st.session_state[cat_key] += 12
                 st.rerun()
 
 with tab2:
