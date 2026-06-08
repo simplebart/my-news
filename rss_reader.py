@@ -66,6 +66,7 @@ div[data-testid="stTextInput"] input {
 .breaking-title { font-size: 14px; font-weight: 600; color: #dde8f8; flex: 1; }
 .breaking-title:hover { color: #7aa8e0; }
 .breaking-time { font-size: 11px; color: #1e3050; white-space: nowrap; }
+.breaking-img { width: 260px; height: 160px; object-fit: cover; border-radius: 10px; flex-shrink: 0; }
 
 /* ── Sectie headers ── */
 .section-title {
@@ -309,18 +310,21 @@ if st.session_state.page == "home":
     st.markdown(f'<div style="font-size:12px;color:#2a3d5a;margin-bottom:20px">{datetime.now().strftime("%A %d %B %Y, %H:%M")}</div>', unsafe_allow_html=True)
 
     # ── Breaking News ──
-    breaking = sorted_all[:6]
+    breaking = sorted_all[:1]
     if breaking:
-        items_html = ""
-        for a in breaking:
-            items_html += f'''<div class="breaking-item">
-                <span class="breaking-source">{esc(a["source"])}</span>
-                <a class="breaking-title" href="{esc(a["link"])}" target="_blank">{esc(a["title"])}</a>
-                <span class="breaking-time">{esc(a["date"])}</span>
-            </div>'''
+        a = breaking[0]
+        img_html = thumb_html(a.get("img",""), "breaking-img") if a.get("img") else ""
+        summary = esc(a["summary"][:200]) + ("…" if len(a["summary"]) > 200 else "") if a.get("summary") else ""
         st.markdown(f'''<div class="breaking-wrap">
             <div class="breaking-label"><span class="breaking-dot"></span> Breaking News</div>
-            {items_html}
+            <div style="display:flex;gap:20px;align-items:flex-start">
+                <div style="flex:1;min-width:0">
+                    <div style="font-size:11px;font-weight:700;color:#2563eb;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">{esc(a["source"])} · {esc(a["date"])}</div>
+                    <a href="{esc(a["link"])}" target="_blank" style="font-size:20px;font-weight:800;color:#f0f6ff;line-height:1.35;text-decoration:none;display:block;margin-bottom:8px">{esc(a["title"])}</a>
+                    <div style="font-size:13px;color:#5a7a9a;line-height:1.6">{summary}</div>
+                </div>
+                {img_html}
+            </div>
         </div>''', unsafe_allow_html=True)
 
     # ── Meer Nieuws ──
