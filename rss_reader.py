@@ -207,6 +207,24 @@ div[data-testid="stHorizontalBlock"] > div[data-testid="column"] > div {
 }
 
 .search-result-count { font-size: 12px; color: #2a3d5a; margin-bottom: 16px; }
+
+/* ── Lijstweergave ── */
+.list-row {
+    padding: 14px 0;
+    border-bottom: 1px solid #111e35;
+}
+.list-meta {
+    font-size: 11px; color: #2a3d5a; margin-bottom: 5px;
+    font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
+}
+.list-title {
+    font-size: 16px; font-weight: 600; line-height: 1.45;
+    text-decoration: none; display: block; margin-bottom: 5px;
+}
+.list-title:hover { color: #7aa8e0 !important; }
+.list-summary {
+    font-size: 13px; color: #5a7a9a; line-height: 1.6;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -538,10 +556,8 @@ with tab1:
     if not arts:
         st.info("Geen artikelen gevonden voor deze categorie.")
     else:
-        cols = st.columns(3)
         for j, a in enumerate(arts):
-            with cols[j % 3]:
-                render_card(a, prefix=f"tab1_{j}")
+            render_card(a, prefix=f"tab1_{j}")
 
 with tab2:
     st.markdown("<br>", unsafe_allow_html=True)
