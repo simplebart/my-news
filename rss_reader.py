@@ -130,7 +130,7 @@ TOPICS = {
     },
 }
 
-for key, val in [("page","home"), ("active_category",""),
+for key, val in [("page","home"), ("active_category",""), ("active_source",""),
                  ("active_topics",{t:True for t in TOPICS}),
                  ("custom_name",""), ("custom_url",""),
                  ("max_items",8), ("keywords",[]), ("show_dupes",False),
@@ -303,6 +303,14 @@ with st.sidebar:
         if st.button(topic, key=f"nav_{topic}", use_container_width=True):
             st.session_state.page="category"; st.session_state.active_category=topic; st.rerun()
     st.markdown("<hr style='border:none;border-top:1px solid #111e35;margin:12px 0'>", unsafe_allow_html=True)
+    st.markdown("<div style='font-size:10px;font-weight:700;color:#1e3050;text-transform:uppercase;letter-spacing:1px;margin:12px 0 8px 0'>Bronnen</div>", unsafe_allow_html=True)
+    all_sources = sorted(set(a["source"] for a in all_articles))
+    for src in all_sources:
+        if st.button(src, key=f"src_nav_{src}", use_container_width=True):
+            st.session_state.page = "source"
+            st.session_state.active_source = src
+            st.rerun()
+    st.markdown("<hr style='border:none;border-top:1px solid #111e35;margin:12px 0'>", unsafe_allow_html=True)
     if st.button("⚙️ Instellingen", use_container_width=True, key="nav_settings"):
         st.session_state.page="settings"; st.rerun()
     if st.button("🔄 Vernieuwen", use_container_width=True, key="refresh"):
@@ -361,7 +369,7 @@ for t in topic_articles:
 def get_img(a, cls="news-thumb"):
     return thumb_html(a.get("img",""), cls)
 
-def render_news_card(a):
+def render_news_card(a, prefix="n", show_source_btn=True):
     summary = esc(a["summary"][:130])+"…" if len(a.get("summary",""))>130 else esc(a.get("summary",""))
     th = get_img(a, "news-thumb")
     st.markdown(f'''<div class="news-card">
@@ -370,6 +378,11 @@ def render_news_card(a):
             <a class="news-title" href="{esc(a["link"])}" target="_blank">{esc(a["title"])}</a>
             <div class="news-summary">{summary}</div>
         </div>{th}</div>''', unsafe_allow_html=True)
+    if show_source_btn:
+        if st.button(f"📰 Meer van {esc(a['source'])}", key=f"{prefix}_src_{a['id']}"):
+            st.session_state.page = "source"
+            st.session_state.active_source = a["source"]
+            st.rerun()
 
 def render_mini_card(a):
     th = get_img(a, "mini-thumb")
@@ -385,12 +398,7 @@ if st.session_state.page == "home":
     st.markdown(f'<div style="font-size:26px;font-weight:800;color:#f0f6ff;padding:16px 0 4px 0;letter-spacing:-0.5px">🗞️ My News</div>', unsafe_allow_html=True)
     st.markdown(f'<div style="font-size:12px;color:#2a3d5a;margin-bottom:20px">{datetime.now().strftime("%A %d %B %Y, %H:%M")}</div>', unsafe_allow_html=True)
 
-    # Bronfilter
-    all_sources = sorted(set(a["source"] for a in all_articles))
-    selected_sources = st.multiselect("🔍 Filter op bron", all_sources, default=[], placeholder="Alle bronnen tonen…")
-    filtered_articles = [a for a in sorted_all if not selected_sources or a["source"] in selected_sources]
-    if not selected_sources:
-        filtered_articles = sorted_all
+    filtered_articles = sorted_all
 
     # Breaking News — alleen BBC, FT en AP, laatste 2 uur anders meest recent
     BREAKING_SOURCES = ["BBC World", "BBC Business", "FT", "FT Markets", "FT Tech", "AP News World"]
@@ -474,6 +482,16 @@ elif st.session_state.page == "category":
         if st.button(f"Laad meer ({len(arts)-show_n} resterend)", use_container_width=True):
             st.session_state[cat_key]+=12; st.rerun()
 
+elif st.session_state.page == "source":
+    src = st.session_state.active_source
+    arts = sorted([a for a in all_articles if a["source"] == src], key=sort_key, reverse=True)
+    if st.button("← Terug naar home", key="back_source"):
+        st.session_state.page = "home"; st.rerun()
+    st.markdown(f'<div style="font-size:24px;font-weight:800;color:#f0f6ff;padding:8px 0 4px 0">{esc(src)}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div style="font-size:12px;color:#2a3d5a;margin-bottom:16px">{len(arts)} artikelen</div>', unsafe_allow_html=True)
+    for j, a in enumerate(arts):
+        render_news_card(a, prefix=f"src_{j}", show_source_btn=False)
+
 elif st.session_state.page == "settings":
     if st.button("← Terug naar home", key="back_settings"):
         st.session_state.page="home"; st.rerun()
@@ -508,4 +526,3 @@ elif st.session_state.page == "settings":
             st.markdown("**⚠️ Feed fouten**")
             for src, err in feed_errors.items():
                 st.markdown(f"<div class='feed-error'>· {src}: verbinding mislukt</div>", unsafe_allow_html=True)
-            
