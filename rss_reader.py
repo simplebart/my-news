@@ -153,10 +153,16 @@ def parse_date(pub_raw):
     # Try RFC 2822 (standard RSS)
     try: return parsedate_to_datetime(pub_raw)
     except: pass
-    # Try ISO 8601 (Atom/Verge/Yahoo)
+    # Try ISO 8601
     for fmt in ["%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d %H:%M:%S"]:
         try:
             dt = datetime.strptime(pub_raw[:19], fmt[:19])
+            return dt.replace(tzinfo=timezone.utc)
+        except: pass
+    # Try US format: MM/DD/YYYY, HH:MM AM/PM
+    for fmt in ["%m/%d/%Y, %I:%M %p", "%m/%d/%Y %I:%M %p", "%m/%d/%Y, %H:%M", "%B %d, %Y, %I:%M %p"]:
+        try:
+            dt = datetime.strptime(pub_raw.strip(), fmt)
             return dt.replace(tzinfo=timezone.utc)
         except: pass
     return None
