@@ -322,15 +322,18 @@ if st.session_state.page == "home":
     breaking = sorted_all[:1]
     if breaking:
         a = breaking[0]
-        img_html = thumb_html(a.get("img",""), "breaking-img") if a.get("img") else ""
+        img_url = a.get("img","")
+        if not img_url and a.get("link"):
+            img_url = get_og_image(a["link"])
+        img_html = thumb_html(img_url, "breaking-img") if img_url else ""
         summary = esc(a["summary"][:200]) + ("…" if len(a["summary"]) > 200 else "") if a.get("summary") else ""
         st.markdown(f'''<div class="breaking-wrap">
             <div class="breaking-label"><span class="breaking-dot"></span> Breaking News</div>
             <div style="display:flex;gap:20px;align-items:flex-start">
                 <div style="flex:1;min-width:0">
                     <div style="font-size:11px;font-weight:700;color:#2563eb;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">{esc(a["source"])} · {esc(a["date"])}</div>
-                    <a href="{esc(a["link"])}" target="_blank" style="font-size:20px;font-weight:800;color:#f0f6ff;line-height:1.35;text-decoration:none;display:block;margin-bottom:8px">{esc(a["title"])}</a>
-                    <div style="font-size:13px;color:#5a7a9a;line-height:1.6">{summary}</div>
+                    <a href="{esc(a["link"])}" target="_blank" style="font-size:20px;font-weight:800;color:#ffffff !important;line-height:1.35;text-decoration:none !important;display:block;margin-bottom:8px">{esc(a["title"])}</a>
+                    <div style="font-size:13px;color:#a0b0c0;line-height:1.6">{summary}</div>
                 </div>
                 {img_html}
             </div>
