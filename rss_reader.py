@@ -153,7 +153,13 @@ def parse_date(pub_raw):
     # Try RFC 2822 (standard RSS)
     try: return parsedate_to_datetime(pub_raw)
     except: pass
-    # Try ISO 8601
+    # Try ISO 8601 with timezone offset e.g. 2026-06-08T13:14:34-04:00
+    try:
+        from datetime import timezone as tz
+        # Python 3.7+ handles %z with colon offset
+        dt = datetime.fromisoformat(pub_raw.strip())
+        return dt.astimezone(timezone.utc)
+    except: pass
     for fmt in ["%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d %H:%M:%S"]:
         try:
             dt = datetime.strptime(pub_raw[:19], fmt[:19])
