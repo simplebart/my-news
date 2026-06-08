@@ -154,7 +154,8 @@ TOPICS = {
     "📊 Economics": {
         "The Economist":    "https://www.economist.com/rss.xml",
         "Reuters Economy":  "https://feeds.reuters.com/reuters/economicsnews",
-        "Reuters World":    "https://feeds.reuters.com/reuters/worldNews",
+        "BBC Business":     "http://feeds.bbci.co.uk/news/business/rss.xml",
+        "Euronews Business":"https://www.euronews.com/rss?format=mrss&level=vertical&name=business",
     },
 }
 
@@ -198,16 +199,19 @@ def thumb_html(url, cls="news-thumb"):
 
 @st.cache_data(ttl=7200, show_spinner=False)
 def get_og_image(url):
-    """Fetch Open Graph image from article page."""
     try:
-        r = requests.get(url, timeout=5, headers={
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
+        r = requests.get(url, timeout=6, headers={
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml",
         })
-        # Find og:image meta tag
-        match = re.search(r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\'][^>]*/?', r.text)
-        if match: return match.group(1)
-        match = re.search(r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\'][^>]*/?', r.text)
-        if match: return match.group(1)
+        html = r.text
+        for pattern in [
+            r'<meta\s+property=["\']og:image["\']\s+content=["\'](https?://[^"\']+)["\']',
+            r'<meta\s+content=["\'](https?://[^"\']+)["\']\s+property=["\']og:image["\']',
+            r'<meta\s+name=["\']twitter:image["\']\s+content=["\'](https?://[^"\']+)["\']',
+        ]:
+            match = re.search(pattern, html, re.IGNORECASE)
+            if match: return match.group(1)
         return ""
     except: return ""
 
