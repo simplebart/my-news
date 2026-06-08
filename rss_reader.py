@@ -169,11 +169,16 @@ def parse_date(pub_raw):
     # The Verge: "Jun 8, 2026 at 7:07 PM GMT+2"
     try:
         clean = pub_raw.strip()
-        clean = re.sub(r'\s+GMT[+-]\d+$', '', clean)
-        clean = re.sub(r'\s+[A-Z]{2,4}$', '', clean)
-        clean = re.sub(r'\s+at\s+', ', ', clean)
-        dt = datetime.strptime(clean, "%b %d, %Y, %I:%M %p")
-        return dt.replace(tzinfo=timezone.utc)
+        clean = re.sub(r'\s+GMT[+-]\d+$', '', clean)       # strip GMT+2
+        clean = re.sub(r'\s+[A-Z]{2,5}$', '', clean)       # strip CEST/CET/EST
+        clean = re.sub(r'\s+at\s+', ', ', clean)            # "at" -> ","
+        clean = re.sub(r',\s*,', ',', clean)                # double comma fix
+        for fmt in ["%b %d, %Y, %I:%M %p", "%b %d, %Y %I:%M %p",
+                    "%B %d, %Y, %I:%M %p", "%B %d, %Y %I:%M %p"]:
+            try:
+                dt = datetime.strptime(clean.strip(), fmt)
+                return dt.replace(tzinfo=timezone.utc)
+            except: pass
     except: pass
     # Yahoo Finance: "Mon, June 8, 2026 at 6:30 PM GMT+2"
     try:
@@ -483,4 +488,3 @@ elif st.session_state.page == "settings":
             st.markdown("**⚠️ Feed fouten**")
             for src, err in feed_errors.items():
                 st.markdown(f"<div class='feed-error'>· {src}: verbinding mislukt</div>", unsafe_allow_html=True)
-            
