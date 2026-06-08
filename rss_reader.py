@@ -119,12 +119,37 @@ div[data-testid="stTextInput"] input:focus {
     overflow: hidden;
     margin-bottom: 14px;
     transition: border-color 0.15s, box-shadow 0.15s;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
 }
 .card-wrap:hover {
     border-color: #1e3a6b;
     box-shadow: 0 4px 24px #0008;
 }
-.card-body { padding: 14px 16px 10px 16px; }
+.card-body {
+    padding: 14px 16px 10px 16px;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+.card-summary {
+    flex: 1;
+}
+.card-footer-row {
+    margin-top: auto;
+}
+
+/* Gelijke kolomhoogte */
+div[data-testid="stHorizontalBlock"] > div[data-testid="stVerticalBlockBorderWrapper"],
+div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+    height: 100% !important;
+}
+div[data-testid="stHorizontalBlock"] > div[data-testid="column"] > div {
+    height: 100% !important;
+    display: flex;
+    flex-direction: column;
+}
 .card-source {
     font-size: 10px; font-weight: 700; color: #4a90d9;
     text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;
