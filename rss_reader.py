@@ -196,7 +196,7 @@ def thumb_html(url, cls="news-thumb"):
     if not url: return ""
     return '<img class="' + cls + '" src="' + esc(url) + '" onerror="this.style.display=\'none\'">'
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_data(ttl=7200, show_spinner=False)
 def get_og_image(url):
     """Fetch Open Graph image from article page."""
     try:
@@ -211,7 +211,7 @@ def get_og_image(url):
         return ""
     except: return ""
 
-@st.cache_data(ttl=60, show_spinner=False)
+@st.cache_data(ttl=300, show_spinner=False)
 def fetch(source, url):
     try:
         r = requests.get(url, timeout=8, headers={"User-Agent": "Mozilla/5.0 Chrome/120.0.0.0 Safari/537.36", "Cache-Control": "no-cache"})
@@ -268,10 +268,18 @@ with st.sidebar:
 
 # Laden
 all_articles, topic_articles, sources_to_load = [], defaultdict(list), []
+# Priority feeds laden eerst
+PRIORITY = ["CNBC Finance", "The Economist"]
+priority_sources = []
+normal_sources = []
 for topic, feeds in TOPICS.items():
     if st.session_state.active_topics.get(topic, True):
         for src, url in feeds.items():
-            sources_to_load.append((topic, src, url))
+            if src in PRIORITY:
+                priority_sources.append((topic, src, url))
+            else:
+                normal_sources.append((topic, src, url))
+sources_to_load = priority_sources + normal_sources
 if st.session_state.custom_url and st.session_state.custom_name:
     sources_to_load.append(("➕ Eigen", st.session_state.custom_name, st.session_state.custom_url))
 
