@@ -117,7 +117,7 @@ div[data-testid="stTextInput"] input:focus {
     border: 1px solid #111e35;
     border-radius: 14px;
     overflow: hidden;
-    margin-bottom: 24px;
+    margin-bottom: 14px;
     transition: border-color 0.15s, box-shadow 0.15s;
     display: flex;
     flex-direction: column;
@@ -128,7 +128,7 @@ div[data-testid="stTextInput"] input:focus {
     box-shadow: 0 4px 24px #0008;
 }
 .card-body {
-    padding: 18px 20px 14px 20px;
+    padding: 12px 14px 10px 14px;
     display: flex;
     flex-direction: column;
     flex: 1;
@@ -151,15 +151,15 @@ div[data-testid="stHorizontalBlock"] > div[data-testid="column"] > div {
     flex-direction: column;
 }
 .card-source {
-    font-size: 10px; font-weight: 700; color: #4a90d9;
+    font-size: 10px; font-weight: 600; color: #4a90d9;
     text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;
 }
 .card-title {
-    font-size: 15px; font-weight: 600; color: #f0f6ff;
+    font-size: 13px; font-weight: 600; color: #f0f6ff;
     line-height: 1.45; margin-bottom: 8px;
 }
 .card-title.dimmed { color: #3a5070 !important; }
-.card-summary { font-size: 12px; color: #7a9cc0; line-height: 1.65; margin-bottom: 10px; }
+.card-summary { font-size: 11px; color: #7a9cc0; line-height: 1.65; margin-bottom: 10px; }
 .card-footer-row {
     display: flex; align-items: center; gap: 8px;
     border-top: 1px solid #1a2e45; padding-top: 8px; margin-top: 4px;
@@ -478,7 +478,7 @@ if search:
 def _img_tag(url, h=175):
     if not url:
         return ""
-    return '<img src="' + esc(url) + f'" style="width:100%;height:{h}px;object-fit:cover;display:block" onerror="this.parentElement.style.display=\'none\'">'
+    return '<img src="' + esc(url) + f'" style="width:100%;height:140px;object-fit:cover;display:block" onerror="this.parentElement.style.display=\'none\'">'
 
 def _tl_img_tag(url):
     if not url:
