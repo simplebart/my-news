@@ -297,17 +297,16 @@ with st.sidebar:
     st.markdown("<hr style='border:none;border-top:1px solid #111e35;margin:0 0 12px 0'>", unsafe_allow_html=True)
     if st.button("🏠 Home", use_container_width=True, key="nav_home"):
         st.session_state.page = "home"; st.rerun()
-    st.markdown("<div style='font-size:10px;font-weight:700;color:#1e3050;text-transform:uppercase;letter-spacing:1px;margin:12px 0 8px 0'>Categorieën</div>", unsafe_allow_html=True)
-    for topic in TOPICS:
-        if not st.session_state.active_topics.get(topic,True): continue
-        if st.button(topic, key=f"nav_{topic}", use_container_width=True):
-            st.session_state.page="category"; st.session_state.active_category=topic; st.rerun()
-    st.markdown("<hr style='border:none;border-top:1px solid #111e35;margin:12px 0'>", unsafe_allow_html=True)
-    st.markdown("<hr style='border:none;border-top:1px solid #111e35;margin:12px 0'>", unsafe_allow_html=True)
-    if st.button("⚙️ Instellingen", use_container_width=True, key="nav_settings"):
-        st.session_state.page="settings"; st.rerun()
-    if st.button("🔄 Vernieuwen", use_container_width=True, key="refresh"):
-        st.cache_data.clear(); st.rerun()
+    with st.expander("📂 Categorieën", expanded=False):
+        for topic in TOPICS:
+            if not st.session_state.active_topics.get(topic,True): continue
+            if st.button(topic, key=f"nav_{topic}", use_container_width=True):
+                st.session_state.page="category"; st.session_state.active_category=topic; st.rerun()
+    with st.expander("⚙️ Instellingen & Vernieuwen", expanded=False):
+        if st.button("⚙️ Instellingen", use_container_width=True, key="nav_settings"):
+            st.session_state.page="settings"; st.rerun()
+        if st.button("🔄 Vernieuwen", use_container_width=True, key="refresh"):
+            st.cache_data.clear(); st.rerun()
 
 # Parallel laden
 all_articles, topic_articles, feed_errors = [], defaultdict(list), {}
