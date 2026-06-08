@@ -187,6 +187,21 @@ def thumb_html(url, cls="news-thumb"):
     if not url: return ""
     return '<img class="' + cls + '" src="' + esc(url) + '" onerror="this.style.display=\'none\'">'
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def get_og_image(url):
+    """Fetch Open Graph image from article page."""
+    try:
+        r = requests.get(url, timeout=5, headers={
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
+        })
+        # Find og:image meta tag
+        match = re.search(r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\'][^>]*/?', r.text)
+        if match: return match.group(1)
+        match = re.search(r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\'][^>]*/?', r.text)
+        if match: return match.group(1)
+        return ""
+    except: return ""
+
 @st.cache_data(ttl=60, show_spinner=False)
 def fetch(source, url):
     try:
@@ -273,7 +288,10 @@ def render_news_card(a, prefix="n"):
     dim = " dimmed" if is_read else ""
     saved_html = ' <span style="color:#2e8b2e;font-size:10px">🔖</span>' if is_saved else ""
     summary = esc(a["summary"][:130]) + ("…" if len(a["summary"]) > 130 else "") if a.get("summary") else ""
-    th = thumb_html(a.get("img",""), "news-thumb")
+    img_url = a.get("img","")
+    if not img_url and a.get("link"):
+        img_url = get_og_image(a["link"])
+    th = thumb_html(img_url, "news-thumb")
     html = f'''<div class="news-card">
         <div class="news-card-body">
             <div class="news-source">{esc(a["source"])} · {esc(a["date"])}{saved_html}</div>
