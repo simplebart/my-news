@@ -83,7 +83,7 @@ div[data-testid="stTextInput"] input {
 .news-card:hover .news-title { color: #7aa8e0 !important; }
 .news-card-body { flex: 1; min-width: 0; }
 .news-source { font-size: 10px; font-weight: 700; color: #2563eb; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
-.news-title { font-size: 14px; font-weight: 600; color: #dde8f8; line-height: 1.4; margin-bottom: 4px; text-decoration: none; display: block; transition: color 0.15s; }
+.news-title { font-size: 15px; font-weight: 700; color: #f0f6ff; line-height: 1.4; margin-bottom: 4px; text-decoration: none; display: block; transition: color 0.15s; }
 .news-title.dimmed { color: #2a3d5a !important; }
 .news-summary { font-size: 12px; color: #4a6a8a; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .news-meta { font-size: 11px; color: #1e3050; margin-top: 4px; }
@@ -297,8 +297,10 @@ def render_news_card(a, prefix="n"):
     st.markdown(html, unsafe_allow_html=True)
 
 def render_mini_card(a):
-    th = thumb_html(a.get("img",""), "mini-thumb")
-    summary = esc(a["summary"][:80]) + "…" if a.get("summary") else ""
+    img_url = a.get("img","")
+    if not img_url and a.get("link"):
+        img_url = get_og_image(a["link"])
+    th = thumb_html(img_url, "mini-thumb")
     html = f'''<div class="mini-card">
         <div class="mini-card-body">
             <div class="mini-source">{esc(a["source"])}</div>
