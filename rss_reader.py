@@ -116,6 +116,8 @@ TOPICS = {
     "🌐 Geopolitiek": {
         "BBC World":       "http://feeds.bbci.co.uk/news/world/rss.xml",
         "AP News World":   "https://apnews.com/rss/apf-topnews",
+        "Axios World":     "https://api.axios.com/feed/world",
+        "CFR":             "https://www.cfr.org/rss/articles.xml",
     },
     "💻 Tech & AI": {
         "TechCrunch":      "https://techcrunch.com/feed/",
@@ -124,7 +126,8 @@ TOPICS = {
     },
     "📊 Economics": {
         "BBC Business":     "http://feeds.bbci.co.uk/news/business/rss.xml",
-        "VoxEU":           "https://cepr.org/rss.xml",
+        "Euronews Business":"https://www.euronews.com/rss?format=mrss&level=vertical&name=business",
+        "Quartz":           "https://qz.com/rss",
         "IMF News":         "https://www.imf.org/en/News/rss?language=eng",
     },
 }
