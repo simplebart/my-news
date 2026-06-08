@@ -148,9 +148,24 @@ def strip_html(text):
 
 def article_id(a): return hashlib.md5((a.get("link","")+a.get("title","")).encode()).hexdigest()[:10]
 
+def parse_date(pub_raw):
+    if not pub_raw: return None
+    # Try RFC 2822 (standard RSS)
+    try: return parsedate_to_datetime(pub_raw)
+    except: pass
+    # Try ISO 8601 (Atom/Verge/Yahoo)
+    for fmt in ["%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d %H:%M:%S"]:
+        try:
+            dt = datetime.strptime(pub_raw[:19], fmt[:19])
+            return dt.replace(tzinfo=timezone.utc)
+        except: pass
+    return None
+
 def relative_time(pub_raw):
     try:
-        mins = int((datetime.now(timezone.utc)-parsedate_to_datetime(pub_raw)).total_seconds()/60)
+        dt = parse_date(pub_raw)
+        if not dt: return ""
+        mins = int((datetime.now(timezone.utc)-dt).total_seconds()/60)
         if mins < 1: return "zojuist"
         if mins < 60: return f"{mins} min"
         h = mins//60
@@ -161,13 +176,14 @@ def relative_time(pub_raw):
 
 def is_recent(pub_raw, hours=2):
     try:
-        dt = parsedate_to_datetime(pub_raw)
+        dt = parse_date(pub_raw)
+        if not dt: return False
         return (datetime.now(timezone.utc) - dt) < timedelta(hours=hours)
     except: return False
 
 def sort_key(a):
-    try: return parsedate_to_datetime(a["pub_raw"])
-    except: return datetime.min.replace(tzinfo=timezone.utc)
+    dt = parse_date(a.get("pub_raw",""))
+    return dt if dt else datetime.min.replace(tzinfo=timezone.utc)
 
 def esc(t): return (t or "").replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace('"',"&quot;")
 
