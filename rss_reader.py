@@ -207,7 +207,7 @@ def relative_time(pub_raw):
         if h < 24: return f"{h} uur"
         d = h//24
         return "gisteren" if d==1 else f"{d} dagen"
-    except: return "?"
+    except: return ""
 
 def is_recent(pub_raw, hours=2):
     try:
@@ -382,12 +382,6 @@ def render_mini_card(a):
 
 # ── PAGINA'S ──────────────────────────────────────────────────────────────────
 if st.session_state.page == "home":
-    # DEBUG - tijdelijk
-    with st.expander("🐛 Debug datums", expanded=False):
-        for a in all_articles:
-            if a["source"] in ["Business Insider", "The Verge", "Yahoo Finance"]:
-                st.text(f"{a['source']}: raw={repr(a['pub_raw'])} → parsed={repr(a['date'])}")
-                break
     st.markdown(f'<div style="font-size:26px;font-weight:800;color:#f0f6ff;padding:16px 0 4px 0;letter-spacing:-0.5px">🗞️ My News</div>', unsafe_allow_html=True)
     st.markdown(f'<div style="font-size:12px;color:#2a3d5a;margin-bottom:20px">{datetime.now().strftime("%A %d %B %Y, %H:%M")}</div>', unsafe_allow_html=True)
 
@@ -421,9 +415,16 @@ if st.session_state.page == "home":
             </div>
         </div>''', unsafe_allow_html=True)
 
-    # Meer Nieuws
+    # Meer Nieuws - max 2 per bron
     st.markdown('<div class="section-title">Meer nieuws</div>', unsafe_allow_html=True)
-    meer_nieuws = [a for a in sorted_all if a["id"] != (breaking_art["id"] if breaking_art else "")][:8]
+    breaking_id = breaking_art["id"] if breaking_art else ""
+    meer_nieuws, source_count = [], {}
+    for a in sorted_all:
+        if a["id"] == breaking_id: continue
+        if source_count.get(a["source"], 0) >= 2: continue
+        meer_nieuws.append(a)
+        source_count[a["source"]] = source_count.get(a["source"], 0) + 1
+        if len(meer_nieuws) >= 8: break
     cols = st.columns(2)
     for j, a in enumerate(meer_nieuws):
         with cols[j%2]: render_news_card(a)
@@ -436,8 +437,14 @@ if st.session_state.page == "home":
             name = " ".join(topic.split()[1:])
             if st.button(f"{topic.split()[0]} {name} →", key=f"topic_nav_{topic}", use_container_width=True):
                 st.session_state.page="category"; st.session_state.active_category=topic; st.rerun()
-            for a in topic_articles.get(topic,[])[:3]:
+            seen_sources = set()
+            count = 0
+            for a in topic_articles.get(topic, []):
+                if a["source"] in seen_sources: continue
+                seen_sources.add(a["source"])
                 render_mini_card(a)
+                count += 1
+                if count >= 3: break
 
 elif st.session_state.page == "category":
     cat = st.session_state.active_category
