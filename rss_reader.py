@@ -165,6 +165,24 @@ def parse_date(pub_raw):
             dt = datetime.strptime(pub_raw.strip(), fmt)
             return dt.replace(tzinfo=timezone.utc)
         except: pass
+    # Business Insider: "Jun 8, 2026, 5:41 PM CEST"
+    # The Verge: "Jun 8, 2026 at 7:07 PM GMT+2"
+    try:
+        clean = pub_raw.strip()
+        clean = re.sub(r'\s+GMT[+-]\d+$', '', clean)
+        clean = re.sub(r'\s+[A-Z]{2,4}$', '', clean)
+        clean = re.sub(r'\s+at\s+', ', ', clean)
+        dt = datetime.strptime(clean, "%b %d, %Y, %I:%M %p")
+        return dt.replace(tzinfo=timezone.utc)
+    except: pass
+    # Yahoo Finance: "Mon, June 8, 2026 at 6:30 PM GMT+2"
+    try:
+        clean = re.sub(r'\s+at\s+', ' ', pub_raw.strip())  # remove "at"
+        clean = re.sub(r'\s+GMT[+-]\d+$', '', clean)        # strip GMT offset
+        clean = re.sub(r'^[A-Za-z]+,\s+', '', clean)        # strip weekday
+        dt = datetime.strptime(clean, "%B %d, %Y %I:%M %p")
+        return dt.replace(tzinfo=timezone.utc)
+    except: pass
     return None
 
 def relative_time(pub_raw):
