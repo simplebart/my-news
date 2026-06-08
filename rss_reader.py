@@ -62,15 +62,15 @@ div[data-testid="stTextInput"] input {
     padding: 8px 0; border-bottom: 1px solid #111e35;
 }
 .breaking-item:last-child { border-bottom: none; }
-.breaking-source { font-size: 10px; font-weight: 700; color: #2563eb; text-transform: uppercase; white-space: nowrap; }
-.breaking-title { font-size: 14px; font-weight: 600; color: #dde8f8; flex: 1; }
+.breaking-source { font-size: 10px; font-weight: 700; color: #888ea8; text-transform: uppercase; white-space: nowrap; }
+.breaking-title { font-size: 14px; font-weight: 600; color: #ffffff; flex: 1; }
 .breaking-title:hover { color: #7aa8e0; }
 .breaking-time { font-size: 11px; color: #1e3050; white-space: nowrap; }
 .breaking-img { width: 260px; height: 160px; object-fit: cover; border-radius: 10px; flex-shrink: 0; }
 
 /* ── Sectie headers ── */
 .section-title {
-    font-size: 18px; font-weight: 800; color: #f0f6ff;
+    font-size: 18px; font-weight: 800; color: #ffffff;
     letter-spacing: -0.3px; margin: 28px 0 16px 0;
     padding-bottom: 10px; border-bottom: 2px solid #111e35;
 }
@@ -80,32 +80,32 @@ div[data-testid="stTextInput"] input {
     display: flex; gap: 14px; align-items: flex-start;
     padding: 14px 0; border-bottom: 1px solid #0f1e35;
 }
-.news-card:hover .news-title { color: #7aa8e0 !important; }
+.news-card:hover .news-title { color: #ccddee !important; }
 .news-card-body { flex: 1; min-width: 0; }
-.news-source { font-size: 10px; font-weight: 700; color: #2563eb; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
-.news-title { font-size: 15px; font-weight: 700; color: #f0f6ff; line-height: 1.4; margin-bottom: 4px; text-decoration: none; display: block; transition: color 0.15s; }
+.news-source { font-size: 10px; font-weight: 700; color: #888ea8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.news-title { font-size: 15px; font-weight: 700; color: #ffffff; line-height: 1.4; margin-bottom: 4px; text-decoration: none; display: block; transition: color 0.15s; }
 .news-title.dimmed { color: #2a3d5a !important; }
-.news-summary { font-size: 12px; color: #4a6a8a; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.news-meta { font-size: 11px; color: #1e3050; margin-top: 4px; }
+.news-summary { font-size: 12px; color: #a0b0c0; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.news-meta { font-size: 11px; color: #606878; margin-top: 4px; }
 .news-thumb { width: 86px; height: 64px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }
 
 /* ── Topic kolom ── */
 .topic-col-header {
-    font-size: 12px; font-weight: 700; color: #5a7a9a;
+    font-size: 12px; font-weight: 700; color: #c0c8d8;
     text-transform: uppercase; letter-spacing: 1px;
     margin-bottom: 12px; padding-bottom: 6px;
     border-bottom: 2px solid #2563eb;
     cursor: pointer; display: flex; justify-content: space-between; align-items: center;
 }
-.topic-col-header:hover { color: #7aa8e0; }
+.topic-col-header:hover { color: #ffffff; }
 .topic-arrow { font-size: 14px; color: #2563eb; }
 .mini-card { padding: 10px 0; border-bottom: 1px solid #0f1e35; display: flex; gap: 10px; align-items: flex-start; }
 .mini-card:last-child { border-bottom: none; }
 .mini-card-body { flex: 1; min-width: 0; }
-.mini-source { font-size: 10px; font-weight: 700; color: #1e3a5f; text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 3px; }
-.mini-title { font-size: 13px; font-weight: 600; color: #c8d8f0; line-height: 1.35; text-decoration: none; display: block; }
-.mini-title:hover { color: #7aa8e0; }
-.mini-time { font-size: 10px; color: #1e3050; margin-top: 3px; }
+.mini-source { font-size: 10px; font-weight: 700; color: #707888; text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 3px; }
+.mini-title { font-size: 13px; font-weight: 600; color: #e8eaf0; line-height: 1.35; text-decoration: none; display: block; }
+.mini-title:hover { color: #ffffff; }
+.mini-time { font-size: 10px; color: #606878; margin-top: 3px; }
 .mini-thumb { width: 54px; height: 40px; object-fit: cover; border-radius: 6px; flex-shrink: 0; }
 
 /* Knoppen */
