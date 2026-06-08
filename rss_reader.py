@@ -189,7 +189,7 @@ def thumb_html(url, cls="news-thumb"):
     if not url: return ph
     return f'<img class="{cls}" src="{esc(url)}" style="width:{w};height:{h};object-fit:cover;border-radius:{r};flex-shrink:0" onerror="this.outerHTML=\'{ph}\'">'
 
-@st.cache_data(ttl=7200, show_spinner=False)
+@st.cache_data(ttl=3600, show_spinner=False)
 def get_og_image(url):
     try:
         r = requests.get(url, timeout=5, headers={
@@ -206,7 +206,7 @@ def get_og_image(url):
         return ""
     except: return ""
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=120, show_spinner=False)
 def fetch(source, url):
     try:
         r = requests.get(url, timeout=8, headers={
@@ -431,4 +431,3 @@ elif st.session_state.page == "settings":
             st.markdown("**⚠️ Feed fouten**")
             for src, err in feed_errors.items():
                 st.markdown(f"<div class='feed-error'>· {src}: verbinding mislukt</div>", unsafe_allow_html=True)
-            
