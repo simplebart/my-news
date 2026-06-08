@@ -385,15 +385,16 @@ if st.session_state.page == "home":
     st.markdown(f'<div style="font-size:26px;font-weight:800;color:#f0f6ff;padding:16px 0 4px 0;letter-spacing:-0.5px">🗞️ My News</div>', unsafe_allow_html=True)
     st.markdown(f'<div style="font-size:12px;color:#2a3d5a;margin-bottom:20px">{datetime.now().strftime("%A %d %B %Y, %H:%M")}</div>', unsafe_allow_html=True)
 
-    # Foutmeldingen
-    if feed_errors:
-        with st.expander(f"⚠️ {len(feed_errors)} bron(nen) niet geladen", expanded=False):
-            for src, err in feed_errors.items():
-                st.markdown(f'<div class="feed-error">· {src}</div>', unsafe_allow_html=True)
+    # Bronfilter
+    all_sources = sorted(set(a["source"] for a in all_articles))
+    selected_sources = st.multiselect("🔍 Filter op bron", all_sources, default=[], placeholder="Alle bronnen tonen…")
+    filtered_articles = [a for a in sorted_all if not selected_sources or a["source"] in selected_sources]
+    if not selected_sources:
+        filtered_articles = sorted_all
 
     # Breaking News — alleen BBC, FT en AP, laatste 2 uur anders meest recent
     BREAKING_SOURCES = ["BBC World", "BBC Business", "FT", "FT Markets", "FT Tech", "AP News World"]
-    trusted = [a for a in sorted_all if a["source"] in BREAKING_SOURCES]
+    trusted = [a for a in filtered_articles if a["source"] in BREAKING_SOURCES]
     recent = [a for a in trusted if is_recent(a["pub_raw"], hours=2)]
     breaking_art = recent[0] if recent else (trusted[0] if trusted else (sorted_all[0] if sorted_all else None))
 
@@ -419,7 +420,7 @@ if st.session_state.page == "home":
     st.markdown('<div class="section-title">Meer nieuws</div>', unsafe_allow_html=True)
     breaking_id = breaking_art["id"] if breaking_art else ""
     meer_nieuws, source_count = [], {}
-    for a in sorted_all:
+    for a in filtered_articles:
         if a["id"] == breaking_id: continue
         if source_count.get(a["source"], 0) >= 2: continue
         meer_nieuws.append(a)
@@ -507,3 +508,4 @@ elif st.session_state.page == "settings":
             st.markdown("**⚠️ Feed fouten**")
             for src, err in feed_errors.items():
                 st.markdown(f"<div class='feed-error'>· {src}: verbinding mislukt</div>", unsafe_allow_html=True)
+            
