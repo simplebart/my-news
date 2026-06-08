@@ -112,7 +112,6 @@ TOPICS = {
         "Yahoo Finance":   "https://finance.yahoo.com/news/rss",
         "Business Insider":"https://feeds.businessinsider.com/custom/all",
         "Investing.com":   "https://investing.com/rss/news.rss",
-        "CNBC Finance":    "https://www.cnbc.com/id/10000664/device/rss/rss.html",
     },
     "🌐 Geopolitiek": {
         "BBC World":       "http://feeds.bbci.co.uk/news/world/rss.xml",
@@ -127,7 +126,6 @@ TOPICS = {
     "📊 Economics": {
         "BBC Business":     "http://feeds.bbci.co.uk/news/business/rss.xml",
         "Euronews Business":"https://www.euronews.com/rss?format=mrss&level=vertical&name=business",
-        "CNBC Economy":     "https://www.cnbc.com/id/20910258/device/rss/rss.html",
         "IMF News":         "https://www.imf.org/en/News/rss?language=eng",
     },
 }
