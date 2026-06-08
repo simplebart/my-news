@@ -115,11 +115,10 @@ TOPICS = {
     },
     "🌐 Geopolitiek": {
         "BBC World":       "http://feeds.bbci.co.uk/news/world/rss.xml",
-        "Politico Europe": "https://www.politico.eu/feed/",
         "AP News World":   "https://apnews.com/rss/apf-topnews",
     },
     "💻 Tech & AI": {
-        "The Verge":       "https://www.theverge.com/rss/index.xml",
+        "TechCrunch":      "https://techcrunch.com/feed/",
         "Ars Technica":    "http://feeds.arstechnica.com/arstechnica/index",
         "FT Tech":         "https://www.ft.com/technology?format=rss",
     },
