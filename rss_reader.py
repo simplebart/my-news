@@ -194,8 +194,12 @@ def dedup(arts, thr=0.6):
             unique.append(a); seen.append(words)
     return unique
 def thumb_html(url, cls="news-thumb"):
-    if not url: return ""
-    return '<img class="' + cls + '" src="' + esc(url) + '" onerror="this.style.display=\'none\'">'
+    w = "86px" if cls == "news-thumb" else "54px"
+    h = "64px" if cls == "news-thumb" else "40px"
+    ph = f'<div style="width:{w};height:{h};background:#111e35;border-radius:8px;flex-shrink:0;border:1px solid #1a2744"></div>'
+    if not url:
+        return ph
+    return '<img class="' + cls + '" src="' + esc(url) + '" style="width:' + w + ';height:' + h + ';object-fit:cover;border-radius:8px;flex-shrink:0" onerror="this.outerHTML=\'' + ph.replace("'", "\\'") + '\'">'
 
 @st.cache_data(ttl=7200, show_spinner=False)
 def get_og_image(url):
