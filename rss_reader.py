@@ -877,40 +877,46 @@ def panel_html(a, size="mid"):
 
 
 def card_html(a):
-    link = html.escape(a["link"], quote=True)
+    link    = html.escape(a["link"], quote=True)
+    title   = html.escape(a["title"])
+    src     = a["source"]
+    color   = color_for(src)
+    inits   = html.escape(initials(src))
     if a["image"]:
-        img = html.escape(a["image"], quote=True)
-        ph  = (f"<div class='media ph' style='background:{color_for(a[\"source\"])}'>"
-               f"{html.escape(initials(a['source']))}</div>")
+        img   = html.escape(a["image"], quote=True)
+        ph    = f"<div class='media ph' style='background:{color}'>{inits}</div>"
         media = f'<img class="media" src="{img}" loading="lazy" onerror="this.outerHTML=&quot;{ph}&quot;">'
         return (f'<a class="cardlink" href="{link}" target="_blank" rel="noopener noreferrer">'
-                f'{media}<div class="ctitle">{html.escape(a["title"])}</div>{_chip(a)}</a>')
-    accent = f'<div class="accent" style="background:{color_for(a["source"])}"></div>'
+                f'{media}<div class="ctitle">{title}</div>{_chip(a)}</a>')
+    accent = f'<div class="accent" style="background:{color}"></div>'
     return (f'<a class="cardlink text" href="{link}" target="_blank" rel="noopener noreferrer">'
-            f'{accent}<div class="ctitle">{html.escape(a["title"])}</div>{_chip(a)}</a>')
+            f'{accent}<div class="ctitle">{title}</div>{_chip(a)}</a>')
 
 
 def mobile_card_html(a, lead=False):
-    link  = html.escape(a["link"], quote=True)
-    color = color_for(a["source"])
+    link   = html.escape(a["link"], quote=True)
+    title  = html.escape(a["title"])
+    src    = a["source"]
+    color  = color_for(src)
+    inits  = html.escape(initials(src))
+    src_e  = html.escape(src)
+    star   = "<span class='star'>★</span>" if a["id"] in starred_set else ""
     kicker = (f'<div class="kicker" style="color:{color}">'
-              f'{icon_html(a["source"])}'
-              f'<span>{html.escape(a["source"])}</span>'
+              f'{icon_html(src)}'
+              f'<span>{src_e}</span>'
               f'<span class="dot">·</span>'
               f'<span class="ago">{relative(a["time"])}</span>'
-              f'{"<span class=star>★</span>" if a["id"] in starred_set else ""}'
-              f'</div>')
+              f'{star}</div>')
     if lead and a["image"]:
         img   = html.escape(a["image"], quote=True)
-        ph    = (f'<div class="thumb-ph" style="background:{color}">'
-                 f'{html.escape(initials(a["source"]))}</div>')
+        ph    = f'<div class="thumb-ph" style="background:{color}">{inits}</div>'
         thumb = f'<img class="thumb" src="{img}" loading="lazy" onerror="this.outerHTML=&quot;{ph}&quot;">'
         return (f'<a class="mcard-lead" href="{link}" target="_blank" rel="noopener noreferrer">'
                 f'{thumb}'
                 f'<div class="body">{kicker}'
-                f'<div class="mt">{html.escape(a["title"])}</div></div></a>')
+                f'<div class="mt">{title}</div></div></a>')
     return (f'<a class="mcard" href="{link}" target="_blank" rel="noopener noreferrer">'
-            f'{kicker}<div class="mt">{html.escape(a["title"])}</div></a>')
+            f'{kicker}<div class="mt">{title}</div></a>')
 
 
 def actions(a):
