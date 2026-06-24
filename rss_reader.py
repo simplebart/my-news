@@ -1,15 +1,17 @@
 """
 Aurora — a personal news hub
-A Streamlit RSS reader art-directed like a magazine, with an Apple "Liquid Glass" feel.
+A Streamlit RSS reader art-directed like a magazine.
 
 Run with:  streamlit run aurora_reader.py
 
-• Editorial layout: a cinematic cover story, then an alternating rhythm of wide
-  feature tiles, stacked cards, and colour-washed text panels.
-• All controls are native, so tabs/folders/sources/save/read update in place —
-  no reload, no new tab, no flash. Only tapping a story opens your browser.
-• Light / dark follows macOS automatically.
-• Feeds live in feeds.json; read/saved state in aurora_state.json (beside this file).
+Deploy free at:  https://streamlit.io/cloud
+  1. Push this file + requirements.txt to a GitHub repo
+  2. Connect repo at share.streamlit.io
+  3. Done — available on any device, 24/7
+
+Feeds live in feeds.json (auto-created on first run).
+Saved state lives in aurora_state.json.
+Per-section volume cap + source diversity are enforced at render time.
 """
 
 import hashlib
@@ -18,80 +20,110 @@ import json
 import os
 import re
 import time
+from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
 import feedparser
 import streamlit as st
 
-# ----------------------------------------------------------------------------
-# Defaults (seed feeds.json on first run)
-# ----------------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────────────────────
+# Config
+# ─────────────────────────────────────────────────────────────────────────────
+
+# How many articles to fetch per individual feed (keeps BBC/Guardian from flooding)
+MAX_PER_FEED = 8
+
+# How many articles to show per section in the grouped view
+SECTION_SIZE = 5
+
+# Max articles from the same source within one section (diversity cap)
+MAX_PER_SOURCE_IN_SECTION = 2
+
+DISPLAY_LIMIT = 80
+USER_NAME     = "Bart"
+
+# Sources whose images are frequently low-res thumbnails — skip their images
+# and fall back to the colour-plate treatment instead.
+LOW_RES_SOURCES = {"BBC News", "BBC Europe", "BBC Sport Football", "The Guardian", "The Guardian Film"}
+
 DEFAULT_FEEDS = {
-    "Culture": [
-        ("1843", "https://www.economist.com/1843/rss.xml"),
-        ("Monocle", "https://monocle.com/feed/"),
-        ("The New Yorker", "https://www.newyorker.com/feed/everything"),
+    "Daily news": [
+        ("BBC News",        "https://feeds.bbci.co.uk/news/rss.xml"),
+        ("BBC Europe",      "https://feeds.bbci.co.uk/news/world/europe/rss.xml"),
+        ("The Guardian",    "https://www.theguardian.com/world/rss"),
+        ("Politico Europe", "https://www.politico.eu/feed/"),
+        ("DW",              "https://rss.dw.com/rdf/rss-en-top"),
+        ("Euronews",        "https://www.euronews.com/rss?level=theme&name=news"),
     ],
-    "Europe": [
-        ("Euractiv", "https://www.euractiv.com/feed/"),
-        ("Foreign Policy", "https://foreignpolicy.com/feed/"),
-        ("POLITICO Europe", "https://www.politico.eu/feed/"),
-    ],
-    "Finances": [
-        ("Financial Times", "https://www.ft.com/markets?format=rss"),
-        ("The Economist", "https://www.economist.com/finance-and-economics/rss.xml"),
-        ("Les Echos", "https://services.lesechos.fr/rss/les-echos-finance-marches.xml"),
+    "Finance": [
+        ("FT",              "https://www.ft.com/rss/home"),
+        ("FT Opinion",      "https://www.ft.com/rss/opinion"),
+        ("The Economist",   "https://www.economist.com/finance-and-economics/rss.xml"),
+        ("MarketWatch",     "https://feeds.marketwatch.com/marketwatch/topstories/"),
     ],
     "Tech": [
-        ("Ars Technica", "https://feeds.arstechnica.com/arstechnica/index"),
-        ("TechCrunch", "https://techcrunch.com/feed/"),
-        ("The Verge", "https://www.theverge.com/rss/index.xml"),
+        ("The Verge",       "https://www.theverge.com/rss/index.xml"),
+        ("Ars Technica",    "https://feeds.arstechnica.com/arstechnica/index"),
+        ("MIT Tech Review", "https://www.technologyreview.com/feed/"),
+    ],
+    "Cultuur": [
+        ("The Guardian Film",  "https://www.theguardian.com/film/rss"),
+        ("Pitchfork",          "https://pitchfork.com/rss/news/"),
+        ("Dezeen",             "https://www.dezeen.com/feed/"),
+        ("It's Nice That",     "https://www.itsnicethat.com/rss"),
+        ("Bon Appétit",        "https://www.bonappetit.com/feed/rss"),
+    ],
+    "Long reads": [
+        ("The Economist Leaders", "https://www.economist.com/leaders/rss.xml"),
+        ("Aeon",                  "https://aeon.co/feed.rss"),
+        ("The Atlantic",          "https://www.theatlantic.com/feed/all/"),
     ],
     "Sport": [
-        ("The Athletic", "https://theathletic.com/rss-feed/"),
         ("BBC Sport Football", "https://feeds.bbci.co.uk/sport/football/rss.xml"),
-        ("NOS Sport", "https://feeds.nos.nl/nossportalgemeen"),
-    ],
-    "Food & Travel": [
-        ("Condé Nast Traveller", "https://www.cntraveller.com/feed/rss"),
-        ("Fool.nl", "https://www.fool.nl/feed/"),
-        ("LOST iS FOUND", "https://lostisfound.com/feed/"),
-    ],
-    "Arts": [
-        ("Dezeen", "https://www.dezeen.com/feed/"),
-        ("It's Nice That", "https://www.itsnicethat.com/rss"),
-        ("De Volkskrant Cultuur", "https://www.volkskrant.nl/cultuur-media/rss.xml"),
+        ("The Race F1",        "https://the-race.com/feed/"),
     ],
 }
-DEFAULT_CALM = ["1843", "Monocle", "The New Yorker", "Foreign Policy",
-                "LOST iS FOUND", "It's Nice That"]
+
+DEFAULT_CALM = ["Aeon", "The Atlantic", "The Economist Leaders", "FT Opinion"]
 
 ACCENTS = {
-    "1843": "#E3120B", "Monocle": "#C8A45C", "The New Yorker": "#2E6FB7",
-    "Euractiv": "#E8B400", "Foreign Policy": "#8C1D40", "POLITICO Europe": "#D11B1F",
-    "Financial Times": "#0F5499", "The Economist": "#E3120B", "Les Echos": "#00457C",
-    "Ars Technica": "#FF4E00", "TechCrunch": "#00B84D", "The Verge": "#7C3AED",
-    "The Athletic": "#000000", "BBC Sport Football": "#FF4B00", "NOS Sport": "#CC0000",
-    "Condé Nast Traveller": "#C9A96E", "Fool.nl": "#E63B2E", "LOST iS FOUND": "#4A9B8E",
-    "Dezeen": "#000000", "It's Nice That": "#FF3B2F", "De Volkskrant Cultuur": "#CC0000",
+    "BBC News":               "#B80000",
+    "BBC Europe":             "#B80000",
+    "BBC Sport Football":     "#D13900",
+    "The Guardian":           "#0084C6",
+    "The Guardian Film":      "#0084C6",
+    "Politico Europe":        "#C8141A",
+    "DW":                     "#1A5EA8",
+    "Euronews":               "#0050A0",
+    "FT":                     "#0F5499",
+    "FT Opinion":             "#0F5499",
+    "The Economist":          "#E3120B",
+    "The Economist Leaders":  "#E3120B",
+    "MarketWatch":            "#007F5F",
+    "The Verge":              "#7C3AED",
+    "Ars Technica":           "#FF4E00",
+    "MIT Tech Review":        "#111111",
+    "Pitchfork":              "#1A1A1A",
+    "Dezeen":                 "#111111",
+    "It's Nice That":         "#FF3B2F",
+    "Bon Appétit":            "#C8322B",
+    "Aeon":                   "#2E5FAB",
+    "The Atlantic":           "#8B1A1A",
+    "The Race F1":            "#E10600",
 }
 
-ALL, TODAY, CALM, ALL_SOURCES = "All Articles", "Today", "Calm Feeds", "All sources"
-SMART = [TODAY, ALL, CALM]
-DISPLAY_LIMIT = 60
+ALL, TODAY, CALM_VIEW, ALL_SOURCES = "All", "Today", "Calm", "All sources"
+SMART = [TODAY, ALL, CALM_VIEW]
 
-# Shown in the greeting at the top — change to your name.
-USER_NAME = "Bart"
-
-HERE = os.path.dirname(os.path.abspath(__file__))
+HERE       = os.path.dirname(os.path.abspath(__file__))
 FEEDS_PATH = os.path.join(HERE, "feeds.json")
 STATE_PATH = os.path.join(HERE, "aurora_state.json")
 
 
-# ----------------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────────────────────
 # Persistence
-# ----------------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────────────────────
 def load_feeds():
     try:
         with open(FEEDS_PATH, "r", encoding="utf-8") as f:
@@ -108,7 +140,8 @@ def load_feeds():
 def save_feeds(feeds, calm):
     try:
         with open(FEEDS_PATH, "w", encoding="utf-8") as f:
-            json.dump({"feeds": {k: [list(p) for p in v] for k, v in feeds.items()}, "calm": calm}, f, indent=2)
+            json.dump({"feeds": {k: [list(p) for p in v] for k, v in feeds.items()},
+                       "calm": calm}, f, indent=2)
     except Exception:
         pass
 
@@ -135,77 +168,100 @@ def aid(link):
 
 
 def toggle_star(i):
-    s = load_state(); (s.discard if i in s else s.add)(i); save_state(s)
+    s = load_state()
+    (s.discard if i in s else s.add)(i)
+    save_state(s)
 
 
-# ----------------------------------------------------------------------------
-# Source identity
-# ----------------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────────────────────
+# Source helpers
+# ─────────────────────────────────────────────────────────────────────────────
 def color_for(name):
     if name in ACCENTS:
         return ACCENTS[name]
     h = int(hashlib.md5(name.encode("utf-8")).hexdigest(), 16)
-    return f"hsl({h % 360},58%,52%)"
+    return f"hsl({h % 360},52%,46%)"
 
 
 def initials(name):
     parts = [p for p in re.split(r"\s+", name) if p]
     if not parts:
         return "?"
-    return parts[0][:2].upper() if len(parts) == 1 else (parts[0][0] + parts[1][0]).upper()
+    return parts[0][:2].upper() if len(parts) == 1 else (parts[0][0] + parts[-1][0]).upper()
 
 
 def icon_html(name):
-    return f'<span class="ico" style="background:{color_for(name)}">{html.escape(initials(name))}</span>'
+    return (f'<span class="ico" style="background:{color_for(name)}">'
+            f'{html.escape(initials(name))}</span>')
 
 
-# ----------------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────────────────────
 # Fetch + parse
-# ----------------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────────────────────
 TAG_RE = re.compile(r"<[^>]+>")
 IMG_RE = re.compile(r'<img[^>]+src=["\']([^"\']+)', re.IGNORECASE)
 
+# Patterns that indicate a low-quality/thumbnail image URL
+BAD_IMG_RE = re.compile(r'(ichef\.bbci\.co\.uk/news/\d+/|i\.guim\.co\.uk/.*?w=\d{1,3}[^0-9])', re.IGNORECASE)
 
 def clean_text(raw):
     return " ".join(html.unescape(TAG_RE.sub(" ", raw or "")).split())
 
 
-def extract_image(entry):
-    media = entry.get("media_thumbnail") or entry.get("media_content")
-    if media and media[0].get("url"):
-        return media[0]["url"]
+def extract_image(entry, source_name=""):
+    # Skip images for sources that serve bad thumbnails
+    if source_name in LOW_RES_SOURCES:
+        return None
+
+    for key in ("media_thumbnail", "media_content"):
+        media = entry.get(key)
+        if media and media[0].get("url"):
+            url = media[0]["url"]
+            if not BAD_IMG_RE.search(url):
+                return url
     for link in entry.get("links", []):
         if link.get("type", "").startswith("image"):
-            return link.get("href")
+            href = link.get("href", "")
+            if href and not BAD_IMG_RE.search(href):
+                return href
     blob = (entry["content"][0].get("value", "") if entry.get("content") else "") + entry.get("summary", "")
     m = IMG_RE.search(blob)
-    return m.group(1) if m else None
+    if m:
+        url = m.group(1)
+        if not BAD_IMG_RE.search(url):
+            return url
+    return None
 
 
 def entry_time(entry):
     for key in ("published_parsed", "updated_parsed"):
         t = entry.get(key)
         if t:
-            return datetime.fromtimestamp(time.mktime(t), tz=timezone.utc)
+            try:
+                return datetime.fromtimestamp(time.mktime(t), tz=timezone.utc)
+            except Exception:
+                pass
     return None
 
 
-def _fetch_one(name_url):
-    name, url = name_url
+def _fetch_one(args):
+    name, url, folder = args
     out = []
     try:
         for e in feedparser.parse(url).entries:
             out.append({
-                "source": name,
-                "title": clean_text(e.get("title", "Untitled")),
-                "link": e.get("link", "#"),
+                "source":  name,
+                "folder":  folder,
+                "title":   clean_text(e.get("title", "Untitled")),
+                "link":    e.get("link", "#"),
                 "summary": clean_text(e.get("summary", "")),
-                "image": extract_image(e),
-                "time": entry_time(e),
+                "image":   extract_image(e, name),
+                "time":    entry_time(e),
             })
     except Exception:
         pass
-    return out
+    out.sort(key=lambda a: a["time"] or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+    return out[:MAX_PER_FEED]
 
 
 @st.cache_data(ttl=900, show_spinner=False)
@@ -222,224 +278,436 @@ def relative(dt):
     if not dt:
         return ""
     diff = (datetime.now(timezone.utc) - dt).total_seconds()
-    if diff < 60:
-        return "now"
-    if diff < 3600:
-        return f"{int(diff // 60)}m ago"
-    if diff < 86400:
-        return f"{int(diff // 3600)}h ago"
-    if diff < 7 * 86400:
-        return f"{int(diff // 86400)}d ago"
+    if diff < 60:        return "now"
+    if diff < 3600:      return f"{int(diff // 60)}m"
+    if diff < 86400:     return f"{int(diff // 3600)}h"
+    if diff < 7 * 86400: return f"{int(diff // 86400)}d"
     return dt.strftime("%d %b")
 
 
-# ----------------------------------------------------------------------------
-# Page + style
-# ----------------------------------------------------------------------------
-st.set_page_config(page_title="Aurora", page_icon="✦", layout="wide", initial_sidebar_state="expanded")
+# ─────────────────────────────────────────────────────────────────────────────
+# Diversity: pick SECTION_SIZE articles from a section, max 2 per source
+# ─────────────────────────────────────────────────────────────────────────────
+def diverse_section(articles, n=SECTION_SIZE, max_per_source=MAX_PER_SOURCE_IN_SECTION):
+    """
+    From a list sorted by recency, pick up to n articles ensuring no single
+    source appears more than max_per_source times.
+    """
+    counts = {}
+    picked = []
+    for a in articles:
+        src = a["source"]
+        if counts.get(src, 0) < max_per_source:
+            counts[src] = counts.get(src, 0) + 1
+            picked.append(a)
+            if len(picked) == n:
+                break
+    return picked
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Page config + CSS
+# ─────────────────────────────────────────────────────────────────────────────
+st.set_page_config(
+    page_title="Aurora",
+    page_icon="✦",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
 CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700;800&display=swap');
-:root{
-  --bg:#080b13; --panel:rgba(255,255,255,.045); --card:rgba(255,255,255,.055);
-  --ink:#f3f3f7; --ink-2:rgba(235,235,245,.62); --ink-3:rgba(235,235,245,.34);
-  --hair:rgba(255,255,255,.12); --sel:rgba(255,255,255,.10);
-  --shadow:0 14px 36px rgba(0,0,0,.34); --accent:#0a84ff; --gold:#F5C85C; --aurora:.55;
-  --serif:'Fraunces',Georgia,'Times New Roman',serif;
-  --sans:-apple-system,'SF Pro Text',BlinkMacSystemFont,'Inter','Segoe UI',Roboto,sans-serif;
+@import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;500;600;700&display=swap');
+
+/* ── Tokens ── */
+:root {
+  --bg:      #0c0f1a;
+  --surface: rgba(255,255,255,.05);
+  --card:    rgba(255,255,255,.065);
+  --ink:     #eeeef3;
+  --ink-2:   rgba(228,228,242,.60);
+  --ink-3:   rgba(228,228,242,.32);
+  --rule:    rgba(255,255,255,.10);
+  --shadow:  0 8px 28px rgba(0,0,0,.36);
+  --gold:    #f0c060;
+  --serif:   'Libre Baskerville', Georgia, serif;
+  --sans:    'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --r:       14px;
+  --r-lg:    20px;
 }
-@media (prefers-color-scheme: light){
-  :root{
-    --bg:#fbfbfd; --panel:#f4f4f7; --card:#ffffff; --ink:#1d1d1f; --ink-2:#6e6e73; --ink-3:#a1a1a8;
-    --hair:#e6e6eb; --sel:#e7e7ee; --shadow:0 8px 24px rgba(0,0,0,.07); --accent:#007aff; --aurora:0;
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg:      #f4f4f0;
+    --surface: rgba(0,0,0,.04);
+    --card:    #ffffff;
+    --ink:     #111118;
+    --ink-2:   #5a5a6c;
+    --ink-3:   #98989e;
+    --rule:    #e0e0e8;
+    --shadow:  0 4px 16px rgba(0,0,0,.08);
+    --gold:    #9a7000;
   }
 }
-html, body, .stApp{ background:var(--bg); font-family:var(--sans); color:var(--ink); }
-.stApp::before{
-  content:""; position:fixed; inset:-30vmax; z-index:0; pointer-events:none; opacity:var(--aurora);
+
+/* ── Base ── */
+html, body, .stApp { background: var(--bg); font-family: var(--sans); color: var(--ink); }
+header[data-testid="stHeader"]  { background: transparent; }
+#MainMenu, footer               { display: none; }
+[data-testid="stAppViewContainer"],
+[data-testid="stMain"],
+[data-testid="stMainBlockContainer"] { background: transparent !important; }
+[data-testid="stMainBlockContainer"] { padding-top: 1.6rem; max-width: 1100px; }
+
+/* ── Ambient glow (dark only) ── */
+.stApp::before {
+  content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
   background:
-    radial-gradient(40vmax 40vmax at 14% 14%, rgba(95,92,255,.55), transparent 60%),
-    radial-gradient(34vmax 34vmax at 88% 12%, rgba(232,92,180,.42), transparent 60%),
-    radial-gradient(42vmax 42vmax at 78% 92%, rgba(58,214,196,.40), transparent 62%);
-  filter: blur(42px) saturate(132%); animation: drift 30s ease-in-out infinite alternate;
+    radial-gradient(ellipse 55vw 48vh at 8%  2%,  rgba(75,95,255,.16), transparent 66%),
+    radial-gradient(ellipse 48vw 44vh at 94% 6%,  rgba(195,75,155,.13), transparent 66%),
+    radial-gradient(ellipse 50vw 46vh at 82% 97%, rgba(35,185,175,.11), transparent 66%);
+  animation: glow 26s ease-in-out infinite alternate;
 }
-@keyframes drift{ 0%{transform:translate3d(0,0,0) scale(1);} 100%{transform:translate3d(-2.5%,2.5%,0) scale(1.06);} }
-@media (prefers-reduced-motion: reduce){ .stApp::before{animation:none;} }
+@media (prefers-color-scheme: light) { .stApp::before { display:none; } }
+@keyframes glow {
+  from { opacity:.7; transform:scale(1); }
+  to   { opacity:1;  transform:scale(1.03) translate(-1%,1%); }
+}
+@media (prefers-reduced-motion:reduce) {
+  .stApp::before, .feature .bg { animation:none !important; transition:none !important; }
+}
 
-header[data-testid="stHeader"]{ background:transparent; }
-#MainMenu, footer{ display:none; }
-[data-testid="stAppViewContainer"], [data-testid="stMain"], [data-testid="stMainBlockContainer"]{ background:transparent !important; }
-[data-testid="stMainBlockContainer"]{ padding-top:1.8rem; max-width:1120px; z-index:1; }
+/* ── Sidebar ── */
+[data-testid="stSidebar"] {
+  background: var(--surface) !important;
+  border-right: 1px solid var(--rule);
+  backdrop-filter: blur(22px);
+}
+[data-testid="stSidebar"] * { color: var(--ink); }
 
-/* sidebar */
-[data-testid="stSidebar"]{ background:var(--panel) !important; border-right:1px solid var(--hair);
-  backdrop-filter:blur(26px) saturate(150%); -webkit-backdrop-filter:blur(26px) saturate(150%); }
-[data-testid="stSidebar"] *{ color:var(--ink); }
-.brand{ display:flex; align-items:center; gap:.55rem; padding:.1rem 0 .3rem; }
-.brand .mark{ width:30px;height:30px;border-radius:9px;display:grid;place-items:center;font-size:16px;color:#fff;
-  background:linear-gradient(135deg,#6E7BFF,#E85CC8 55%,#3FD6C8);
-  box-shadow:0 4px 14px rgba(120,90,255,.45), inset 0 1px 0 rgba(255,255,255,.5); }
-.brand .name{ font-family:var(--serif); font-weight:600; font-size:1.3rem; letter-spacing:-.01em; }
-.cap{ font-size:.7rem; letter-spacing:.10em; text-transform:uppercase; color:var(--ink-3); font-weight:700; margin:.9rem .1rem -.2rem; }
+.brand {
+  display:flex; align-items:center; gap:.5rem; padding:.2rem 0 .55rem;
+}
+.brand .mark {
+  width:28px; height:28px; border-radius:8px; display:grid; place-items:center;
+  font-size:13px; color:#fff;
+  background: linear-gradient(135deg, #5b6fff, #c44eba 55%, #38d4be);
+  box-shadow: 0 3px 12px rgba(91,111,255,.5), inset 0 1px 0 rgba(255,255,255,.4);
+}
+.brand .name {
+  font-family:var(--serif); font-weight:700; font-size:1.22rem; letter-spacing:-.01em;
+}
+.sidebar-cap {
+  font-size:.67rem; letter-spacing:.10em; text-transform:uppercase;
+  color:var(--ink-3); font-weight:700; margin:.9rem 0 -.1rem;
+}
 
-/* native widgets */
-.stButton button, .stDownloadButton button{ border-radius:9px; border:1px solid var(--hair); background:var(--card);
-  color:var(--ink); font-weight:600; font-size:.78rem; padding:.3rem .5rem; transition:all .14s ease; }
-.stButton button:hover{ background:var(--sel); }
-[data-testid="stTextInput"] input{ background:var(--card) !important; color:var(--ink) !important;
-  border:1px solid var(--hair) !important; border-radius:12px !important; }
-[data-testid="stTextInput"] input::placeholder{ color:var(--ink-3) !important; }
-[data-baseweb="select"] > div{ background:var(--card) !important; border-color:var(--hair) !important; border-radius:10px !important; }
-[data-testid="stRadio"] label{ font-size:.93rem; }
+/* Layout toggle buttons at sidebar bottom */
+.layout-toggle {
+  display:flex; gap:8px; padding: .6rem 0 .2rem;
+}
+.layout-toggle button {
+  flex:1; border-radius:10px; border:1px solid var(--rule);
+  background:var(--card); color:var(--ink);
+  font-size:.78rem; font-weight:600; padding:.45rem .5rem;
+  cursor:pointer; transition:background .13s, border-color .13s;
+}
+.layout-toggle button.active {
+  background: rgba(91,111,255,.22);
+  border-color: rgba(91,111,255,.55);
+  color: var(--ink);
+}
+.layout-toggle button:hover:not(.active) { background:var(--surface); }
 
-/* time-of-day greeting */
-.greet{ display:flex; align-items:center; gap:.65rem; margin:.1rem 0 .55rem; }
-.greet .gtext{ font-family:var(--serif); font-size:2.7rem; font-weight:600; letter-spacing:-.02em; line-height:1; }
-.greet .gpre{ background:linear-gradient(120deg, var(--ga), var(--gb)); -webkit-background-clip:text;
-  background-clip:text; -webkit-text-fill-color:transparent; }
-.greet .gname{ color:var(--ink); }
-.greet .orb{ width:20px; height:20px; border-radius:50%; flex:none; }
-.greet.tod-morning{ --ga:#FFC76B; --gb:#FF8FA3; }
-.greet.tod-afternoon{ --ga:#7CC7FF; --gb:#5B8CFF; }
-.greet.tod-evening{ --ga:#FF9E5E; --gb:#B65CC8; }
-.greet.tod-night{ --ga:#9A8CFF; --gb:#4FD6C8; }
-.greet:not(.tod-night) .orb{ background:radial-gradient(circle at 34% 30%, var(--ga), var(--gb));
-  box-shadow:0 0 18px color-mix(in srgb, var(--gb) 55%, transparent); }
-.greet.tod-night .orb{ background:transparent;
-  box-shadow:inset -6px -3px 0 0 var(--ga), 0 0 16px color-mix(in srgb, var(--ga) 50%, transparent); }
+/* ── Widgets ── */
+.stButton button {
+  border-radius:8px; border:1px solid var(--rule);
+  background:var(--card); color:var(--ink);
+  font-weight:600; font-size:.76rem; padding:.28rem .55rem;
+  transition:background .13s;
+}
+.stButton button:hover { background:var(--surface); }
+[data-testid="stTextInput"] input {
+  background:var(--card) !important; color:var(--ink) !important;
+  border:1px solid var(--rule) !important; border-radius:10px !important;
+}
+[data-testid="stTextInput"] input::placeholder { color:var(--ink-3) !important; }
+[data-baseweb="select"] > div {
+  background:var(--card) !important; border-color:var(--rule) !important; border-radius:9px !important;
+}
 
-/* edition header */
-.edhead .section{ font-family:var(--serif); font-size:2.7rem; font-weight:600; letter-spacing:-.015em; line-height:1; color:var(--ink); }
-.edhead .dateline{ text-transform:uppercase; letter-spacing:.14em; font-size:.7rem; font-weight:700; color:var(--ink-3); margin-top:.1rem; }
-.edhead .dateline b{ color:var(--ink-2); }
-.edhead .rule{ height:1px; margin-top:.7rem; background:linear-gradient(90deg, var(--hair) 0%, var(--hair) 40%, transparent 100%); }
+/* ── Masthead ── */
+.greet { display:flex; align-items:baseline; gap:.45rem; margin-bottom:.2rem; }
+.greet-pre  { font-family:var(--serif); font-style:italic; font-size:1.85rem; font-weight:400; color:var(--ink-2); }
+.greet-name { font-family:var(--serif); font-size:1.85rem; font-weight:700; color:var(--ink); letter-spacing:-.02em; }
+.masthead-meta {
+  font-size:.71rem; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--ink-3); font-weight:600; margin-bottom:.65rem;
+}
+.masthead-rule { height:1px; margin-bottom:1rem; background:linear-gradient(90deg, var(--rule), transparent 100%); }
 
-/* shared kicker + chip */
-.kicker{ display:flex; align-items:center; gap:.45rem; text-transform:uppercase; letter-spacing:.08em;
-  font-size:.68rem; font-weight:800; margin-bottom:.5rem; }
-.kicker .dot{ opacity:.5; } .kicker .ago{ opacity:.8; font-weight:700; letter-spacing:.04em; }
-.kicker .star{ color:var(--gold); }
-.ico{ width:18px;height:18px;border-radius:5px;flex:none;display:inline-grid;place-items:center;
-  color:#fff;font-size:.5rem;font-weight:800; box-shadow:inset 0 1px 0 rgba(255,255,255,.3); }
-.chip{ display:flex; align-items:center; gap:.4rem; font-size:.75rem; color:var(--ink-2); font-weight:600; margin-top:.5rem; }
-.chip .ago{ color:var(--ink-3); font-weight:500; } .chip .star{ color:var(--gold); margin-left:.2rem; }
+/* ── Source identity ── */
+.ico {
+  width:17px; height:17px; border-radius:4px; flex:none;
+  display:inline-grid; place-items:center;
+  color:#fff; font-size:.5rem; font-weight:800;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.22);
+}
+.kicker {
+  display:flex; align-items:center; gap:.38rem;
+  font-size:.66rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
+  margin-bottom:.38rem;
+}
+.kicker .dot  { opacity:.4; }
+.kicker .ago  { opacity:.72; }
+.kicker .star { color:var(--gold); }
+.chip {
+  display:flex; align-items:center; gap:.36rem;
+  font-size:.72rem; color:var(--ink-2); font-weight:600; margin-top:.42rem;
+}
+.chip .ago  { color:var(--ink-3); font-weight:400; }
+.chip .star { color:var(--gold); margin-left:.14rem; }
 
-/* ---- COVER / FEATURE: headline on a frosted glass plate over the photo ---- */
-.feature{ position:relative; display:block; border-radius:18px; overflow:hidden; text-decoration:none;
-  box-shadow:var(--shadow); min-height:240px; isolation:isolate; }
-.feature.cover{ min-height:460px; }
-.feature.read{ opacity:.55; }
-.feature .bg{ position:absolute; inset:0; background-size:cover; background-position:center; z-index:0;
-  transition:transform .7s cubic-bezier(.2,.7,.2,1); }
-.feature:hover .bg{ transform:scale(1.06); }
-.feature::after{ content:""; position:absolute; inset:0; z-index:3; pointer-events:none; border-radius:inherit;
-  background:linear-gradient(115deg, transparent 36%, rgba(255,255,255,.16) 48%, transparent 62%);
-  transform:translateX(-130%); transition:transform .85s ease; }
-.feature:hover::after{ transform:translateX(130%); }
-.feature .plate{ position:absolute; left:14px; right:14px; bottom:14px; z-index:2; padding:.85rem 1rem;
-  background:rgba(14,14,20,.30); backdrop-filter:blur(22px) saturate(165%); -webkit-backdrop-filter:blur(22px) saturate(165%);
-  border:1px solid rgba(255,255,255,.22); border-radius:15px;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.42), 0 10px 26px rgba(0,0,0,.30); }
-.feature.cover .plate{ left:20px; right:20px; bottom:20px; padding:1.05rem 1.25rem; max-width:74%; }
-.feature .kicker{ color:#fff; margin-bottom:.45rem; }
-.feature .kicker .ico{ box-shadow:inset 0 1px 0 rgba(255,255,255,.4); }
-.feature .ft{ font-family:var(--serif); font-weight:600; color:#fff; letter-spacing:-.01em; line-height:1.08; margin:0;
-  display:-webkit-box; -webkit-box-orient:vertical; overflow:hidden; }
-.feature .ft{ font-size:1.4rem; -webkit-line-clamp:3; }
-.feature.cover .ft{ font-size:2.5rem; -webkit-line-clamp:4; }
-.feature .fdek{ color:rgba(255,255,255,.86); font-size:.95rem; line-height:1.5; margin:.55rem 0 0;
-  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-.feature.cover .fdek::first-letter{ font-family:var(--serif); font-size:2.5em; float:left; line-height:.72;
-  padding:.06em .12em 0 0; font-weight:600; color:#fff; }
+/* ── Section divider ── */
+.section-rule {
+  display:flex; align-items:center; gap:.65rem; margin:1.8rem 0 .85rem;
+}
+.section-rule .label {
+  font-size:.67rem; font-weight:800; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--ink-3); white-space:nowrap;
+}
+.section-rule .line { flex:1; height:1px; background:var(--rule); }
 
-/* ---- TEXT PANEL (no image, colour-washed glass) ---- */
-.panel{ position:relative; display:block; overflow:hidden; text-decoration:none; color:var(--ink); border-radius:18px;
-  padding:1.15rem 1.3rem; border:1px solid var(--hair); box-shadow:inset 0 1px 0 rgba(255,255,255,.10), var(--shadow); min-height:200px;
-  background:linear-gradient(150deg, color-mix(in srgb, var(--c) 22%, transparent), transparent 64%), var(--card); }
-.panel.read{ opacity:.55; }
-.panel::after{ content:""; position:absolute; inset:0; pointer-events:none; border-radius:inherit;
-  background:linear-gradient(115deg, transparent 36%, color-mix(in srgb, var(--c) 22%, transparent) 48%, transparent 62%);
-  transform:translateX(-130%); transition:transform .85s ease; }
-.panel:hover::after{ transform:translateX(130%); }
-.panel .kicker{ color:var(--c); }
-.panel .pt{ font-family:var(--serif); font-weight:600; letter-spacing:-.01em; line-height:1.12; margin:0; color:var(--ink);
-  display:-webkit-box; -webkit-box-orient:vertical; overflow:hidden; -webkit-line-clamp:4; }
-.panel .pt{ font-size:1.5rem; } .panel.cover .pt{ font-size:2.3rem; -webkit-line-clamp:4; }
-.panel .pdek{ color:var(--ink-2); font-size:.95rem; line-height:1.5; margin:.55rem 0 0;
-  display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+/* ── Feature (photo overlay) ── */
+.feature {
+  position:relative; display:block; border-radius:var(--r-lg);
+  overflow:hidden; text-decoration:none;
+  box-shadow:var(--shadow); isolation:isolate;
+}
+.feature.cover { min-height:420px; }
+.feature.mid   { min-height:260px; }
+.feature.small { min-height:180px; }
+.feature.read  { opacity:.48; }
 
-/* ---- STANDARD / COMPACT cards (bordered container) ---- */
-[data-testid="stVerticalBlockBorderWrapper"]:has(> div .cardlink){
-  background:var(--card); border:1px solid var(--hair) !important; border-radius:15px;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.10), var(--shadow);
-  transition:transform .16s ease, box-shadow .16s ease; }
-[data-testid="stVerticalBlockBorderWrapper"]:has(> div .cardlink):hover{ transform:translateY(-2px); box-shadow:0 18px 38px rgba(0,0,0,.16); }
-.cardlink{ display:block; text-decoration:none; color:inherit; }
-.cardlink.read{ opacity:.5; }
-.cardlink .media{ width:100%; aspect-ratio:16/10; object-fit:cover; border-radius:10px; display:block; }
-.cardlink.compact .media{ aspect-ratio:16/9; }
-.cardlink .ph{ display:grid; place-items:center; color:#fff; font-weight:800; font-size:1.4rem; }
-.cardlink .accent{ height:4px; width:40px; border-radius:3px; margin:.1rem 0 .5rem; }
-.ctitle{ font-weight:750; font-size:1rem; line-height:1.27; letter-spacing:-.012em; color:var(--ink); margin:.6rem 0 0;
-  display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
-.cardlink.compact .ctitle{ font-size:.93rem; -webkit-line-clamp:2; }
-.cardlink.text .ctitle{ font-family:var(--serif); font-weight:600; font-size:1.22rem; -webkit-line-clamp:4; margin-top:.1rem; }
-.cardlink.text.compact .ctitle{ font-size:1.05rem; -webkit-line-clamp:3; }
+.feature .bg {
+  position:absolute; inset:0; z-index:0;
+  background-size:cover; background-position:center;
+  transition:transform .7s cubic-bezier(.2,.7,.2,1);
+}
+.feature:hover .bg { transform:scale(1.04); }
 
-.empty{ text-align:center; color:var(--ink-2); padding:3.5rem 1rem; }
-.empty .big{ font-family:var(--serif); font-size:1.4rem; color:var(--ink); font-weight:600; margin-bottom:.4rem; }
-.more{ text-align:center; color:var(--ink-3); font-size:.8rem; padding:1.6rem 0 .6rem; }
+/* sheen sweep */
+.feature::after {
+  content:""; position:absolute; inset:0; z-index:3; pointer-events:none;
+  border-radius:inherit;
+  background:linear-gradient(115deg,transparent 38%,rgba(255,255,255,.12) 50%,transparent 62%);
+  transform:translateX(-130%); transition:transform .9s ease;
+}
+.feature:hover::after { transform:translateX(130%); }
 
-/* balance columns: every card fills its row height; actions sit at the bottom */
-[data-testid="stColumn"]{ display:flex; }
-[data-testid="stColumn"] > [data-testid="stVerticalBlockBorderWrapper"]{ width:100%; height:100%; }
+.feature .plate {
+  position:absolute; left:14px; right:14px; bottom:14px; z-index:2;
+  padding:.8rem 1rem;
+  background:rgba(8,10,18,.40);
+  backdrop-filter:blur(18px) saturate(155%);
+  border:1px solid rgba(255,255,255,.17);
+  border-radius:13px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.30), 0 6px 20px rgba(0,0,0,.26);
+}
+.feature.cover .plate { left:22px; right:22px; bottom:22px; padding:1rem 1.25rem; max-width:70%; }
+
+.feature .kicker  { color:rgba(255,255,255,.88); }
+.feature .ft {
+  font-family:var(--serif); font-weight:700; color:#fff;
+  letter-spacing:-.018em; line-height:1.1; margin:0;
+  display:-webkit-box; -webkit-box-orient:vertical; overflow:hidden;
+}
+.feature.cover .ft  { font-size:2.2rem; -webkit-line-clamp:4; }
+.feature.mid .ft    { font-size:1.3rem; -webkit-line-clamp:3; }
+.feature.small .ft  { font-size:1.05rem; -webkit-line-clamp:3; }
+
+.feature .fdek {
+  color:rgba(255,255,255,.78); font-size:.9rem; line-height:1.5; margin:.45rem 0 0;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+}
+.feature.cover .fdek::first-letter {
+  font-family:var(--serif); font-size:2.4em; float:left;
+  line-height:.72; padding:.05em .11em 0 0; font-weight:700; color:#fff;
+}
+
+/* ── Panel (colour-plate, no photo) ── */
+.panel {
+  position:relative; display:block; overflow:hidden;
+  text-decoration:none; color:var(--ink);
+  border-radius:var(--r-lg);
+  padding:1rem 1.2rem;
+  border:1px solid var(--rule);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.07), var(--shadow);
+  background:
+    linear-gradient(148deg, color-mix(in srgb, var(--c) 14%, transparent), transparent 58%),
+    var(--card);
+}
+.panel.cover { min-height:420px; }
+.panel.mid   { min-height:260px; }
+.panel.small { min-height:180px; }
+.panel.read  { opacity:.48; }
+.panel::after {
+  content:""; position:absolute; inset:0; pointer-events:none; border-radius:inherit;
+  background:linear-gradient(115deg,transparent 38%,
+    color-mix(in srgb, var(--c) 16%, transparent) 50%,transparent 62%);
+  transform:translateX(-130%); transition:transform .9s ease;
+}
+.panel:hover::after { transform:translateX(130%); }
+.panel .kicker { color:var(--c); }
+.panel .pt {
+  font-family:var(--serif); font-weight:700;
+  letter-spacing:-.015em; line-height:1.13; margin:0; color:var(--ink);
+  display:-webkit-box; -webkit-box-orient:vertical; overflow:hidden;
+}
+.panel.cover .pt  { font-size:2rem;   -webkit-line-clamp:5; }
+.panel.mid .pt    { font-size:1.35rem;-webkit-line-clamp:4; }
+.panel.small .pt  { font-size:1.05rem;-webkit-line-clamp:4; }
+.panel .pdek {
+  color:var(--ink-2); font-size:.9rem; line-height:1.5; margin:.45rem 0 0;
+  display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;
+}
+
+/* ── Standard card (small, bordered) ── */
+[data-testid="stVerticalBlockBorderWrapper"]:has(> div .cardlink) {
+  background:var(--card) !important;
+  border:1px solid var(--rule) !important;
+  border-radius:var(--r) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.06), var(--shadow);
+  transition:transform .15s ease, box-shadow .15s ease;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(> div .cardlink):hover {
+  transform:translateY(-2px);
+  box-shadow: 0 14px 32px rgba(0,0,0,.18);
+}
+.cardlink { display:block; text-decoration:none; color:inherit; }
+.cardlink.read { opacity:.44; }
+.cardlink .media {
+  width:100%; aspect-ratio:16/10; object-fit:cover;
+  border-radius:9px; display:block;
+}
+.cardlink .ph {
+  display:grid; place-items:center;
+  color:#fff; font-weight:800; font-size:1.25rem;
+}
+.cardlink .accent { height:3px; width:32px; border-radius:3px; margin:.1rem 0 .42rem; }
+.ctitle {
+  font-family:var(--serif); font-weight:700; font-size:.97rem;
+  line-height:1.3; letter-spacing:-.01em; color:var(--ink); margin:.52rem 0 0;
+  display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;
+}
+
+/* ── Mobile list card ── */
+.mcard {
+  display:block; text-decoration:none; color:var(--ink);
+  background:var(--card); border:1px solid var(--rule);
+  border-radius:var(--r); padding:.85rem 1rem;
+  margin-bottom:.55rem;
+  box-shadow:var(--shadow);
+  transition:transform .14s;
+}
+.mcard:hover { transform:translateX(3px); }
+.mcard.read  { opacity:.45; }
+.mcard .mt {
+  font-family:var(--serif); font-weight:700; font-size:1rem;
+  line-height:1.28; color:var(--ink); margin:.3rem 0 .38rem;
+  display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;
+}
+.mcard .msub { font-size:.7rem; color:var(--ink-3); font-weight:500; }
+.mcard-lead {
+  display:flex; gap:.85rem; align-items:flex-start;
+  background:var(--card); border:1px solid var(--rule);
+  border-radius:var(--r); padding:.9rem 1rem;
+  margin-bottom:.55rem;
+  box-shadow:var(--shadow);
+  text-decoration:none; color:var(--ink);
+}
+.mcard-lead .thumb {
+  width:78px; height:64px; border-radius:8px; flex:none;
+  object-fit:cover; background:var(--surface);
+}
+.mcard-lead .thumb-ph {
+  width:78px; height:64px; border-radius:8px; flex:none;
+  display:grid; place-items:center;
+  font-weight:800; font-size:1.1rem; color:#fff;
+}
+.mcard-lead .body { flex:1; min-width:0; }
+.mcard-lead .mt {
+  font-family:var(--serif); font-weight:700; font-size:.97rem;
+  line-height:1.28; color:var(--ink); margin:.3rem 0 .35rem;
+  display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;
+}
+
+/* ── Save button ── */
+[data-testid="stMain"] .stButton { display:flex; justify-content:flex-end; margin-top:.32rem; }
+[data-testid="stMain"] .stButton > button {
+  width:auto; min-height:0; font-size:.71rem; font-weight:600;
+  padding:.2rem .58rem; border-radius:999px;
+}
+
+/* ── Empty / more ── */
+.empty { text-align:center; color:var(--ink-2); padding:4rem 1rem; }
+.empty .big { font-family:var(--serif); font-size:1.35rem; color:var(--ink); font-weight:700; margin-bottom:.4rem; }
+.more { text-align:center; color:var(--ink-3); font-size:.77rem; padding:1.5rem 0 .5rem; }
+
+/* ── Column height balance ── */
+[data-testid="stColumn"] { display:flex; }
+[data-testid="stColumn"] > [data-testid="stVerticalBlockBorderWrapper"] { width:100%; height:100%; }
 [data-testid="stColumn"] > [data-testid="stVerticalBlockBorderWrapper"] > div,
-[data-testid="stColumn"] > div[data-testid="stVerticalBlock"]{ height:100%; display:flex; flex-direction:column; }
-[data-testid="stColumn"] [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:last-child,
-[data-testid="stColumn"] > div[data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:last-child{ margin-top:auto; }
-.cardlink .ctitle{ margin-bottom:.1rem; }
-
-/* compact Save button, pinned bottom-right of each article (main area only) */
-[data-testid="stMain"] .stButton{ display:flex; justify-content:flex-end; margin-top:.4rem; }
-[data-testid="stMain"] .stButton > button{ width:auto; min-height:0; font-size:.74rem; font-weight:600;
-  padding:.26rem .66rem; border-radius:999px; }
+[data-testid="stColumn"] > div[data-testid="stVerticalBlock"] { height:100%; display:flex; flex-direction:column; }
+[data-testid="stColumn"] [data-testid="stVerticalBlockBorderWrapper"]
+  [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:last-child,
+[data-testid="stColumn"] > div[data-testid="stVerticalBlock"]
+  > [data-testid="stElementContainer"]:last-child { margin-top:auto; }
 </style>
 """
 st.html(CSS)
 
-# ----------------------------------------------------------------------------
-# Load config + state
-# ----------------------------------------------------------------------------
-feeds, calm = load_feeds()
-starred_set = load_state()
-all_sources = [s for items in feeds.values() for s, _ in items]
 
-# ----------------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────────────────────
+# Load config + state
+# ─────────────────────────────────────────────────────────────────────────────
+feeds, calm   = load_feeds()
+starred_set   = load_state()
+all_sources   = [s for items in feeds.values() for s, _ in items]
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Layout mode (mobile / desktop) — stored in session state
+# ─────────────────────────────────────────────────────────────────────────────
+if "layout" not in st.session_state:
+    st.session_state.layout = "desktop"
+
+def set_layout(mode):
+    st.session_state.layout = mode
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Sidebar
-# ----------------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.html('<div class="brand"><div class="mark">✦</div><div class="name">Aurora</div></div>')
 
-    st.html('<div class="cap">Library</div>')
+    st.html('<div class="sidebar-cap">Library</div>')
     view = st.radio("Library", SMART + list(feeds.keys()), label_visibility="collapsed")
 
-    if view == CALM:
+    if view == CALM_VIEW:
         view_sources = [s for s in calm if s in all_sources]
     elif view in (TODAY, ALL):
         view_sources = all_sources
     else:
         view_sources = [s for s, _ in feeds.get(view, [])]
 
-    st.html('<div class="cap">Source</div>')
+    st.html('<div class="sidebar-cap">Source</div>')
     source = st.selectbox("Source", [ALL_SOURCES, *view_sources], label_visibility="collapsed")
 
     with st.expander("⚙︎  Manage feeds"):
         st.caption("Add a feed")
-        nf_name = st.text_input("Name", key="nf_name", placeholder="e.g. Wired")
-        nf_url = st.text_input("RSS URL", key="nf_url", placeholder="https://…/feed")
-        fold_opts = list(feeds.keys()) + ["➕ New folder…"]
-        nf_fold = st.selectbox("Folder", fold_opts, key="nf_fold")
+        nf_name = st.text_input("Name",    key="nf_name", placeholder="e.g. Wired")
+        nf_url  = st.text_input("RSS URL", key="nf_url",  placeholder="https://…/feed")
+        fold_opts  = list(feeds.keys()) + ["➕ New folder…"]
+        nf_fold    = st.selectbox("Folder", fold_opts, key="nf_fold")
         nf_newfold = st.text_input("New folder name", key="nf_newfold") if nf_fold == "➕ New folder…" else ""
         if st.button("Add feed", key="add_feed", use_container_width=True):
             folder = (nf_newfold or "").strip() if nf_fold == "➕ New folder…" else nf_fold
@@ -449,7 +717,7 @@ with st.sidebar:
                     feeds[folder].append((nf_name.strip(), nf_url.strip()))
                     save_feeds(feeds, calm); fetch.clear(); st.rerun()
             else:
-                st.warning("Name, URL and folder are all required.")
+                st.warning("Name, URL and folder are required.")
 
         st.divider()
         st.caption("Remove a feed")
@@ -457,7 +725,7 @@ with st.sidebar:
         if labels:
             rm = st.selectbox("Feed", labels, key="rm_pick", label_visibility="collapsed")
             if st.button("Remove", key="rm_feed", use_container_width=True):
-                rfold, rname = [x.strip() for x in rm.split("—")]
+                rfold, rname = [x.strip() for x in rm.split("—", 1)]
                 feeds[rfold] = [(n, u) for n, u in feeds[rfold] if n != rname]
                 if not feeds[rfold]:
                     del feeds[rfold]
@@ -465,40 +733,57 @@ with st.sidebar:
                 save_feeds(feeds, calm); fetch.clear(); st.rerun()
 
         st.divider()
-        st.caption("Calm Feeds (read-at-leisure lane)")
-        new_calm = st.multiselect("Calm sources", all_sources, default=[c for c in calm if c in all_sources],
-                                  key="calm_pick", label_visibility="collapsed")
+        st.caption("Calm feeds (read-at-leisure)")
+        new_calm = st.multiselect(
+            "Calm sources", all_sources,
+            default=[c for c in calm if c in all_sources],
+            key="calm_pick", label_visibility="collapsed",
+        )
         if set(new_calm) != set(calm):
             save_feeds(feeds, new_calm); st.rerun()
 
-    if st.button("↻  Refresh feeds", use_container_width=True):
+    if st.button("↻  Refresh", use_container_width=True):
         fetch.clear(); st.rerun()
 
-# ----------------------------------------------------------------------------
-# Gather + filter
-# ----------------------------------------------------------------------------
-if view == CALM:
-    targets = tuple((n, u) for items in feeds.values() for n, u in items if n in set(calm))
-elif view in (TODAY, ALL):
-    targets = tuple((n, u) for items in feeds.values() for n, u in items)
-else:
-    targets = tuple(feeds.get(view, []))
+    # ── Layout toggle — pinned at the bottom ──
+    st.html('<div class="sidebar-cap">Layout</div>')
+    is_desktop = st.session_state.layout == "desktop"
+    lc1, lc2 = st.columns(2, gap="small")
+    with lc1:
+        if st.button("🖥  Desktop", use_container_width=True,
+                     type="primary" if is_desktop else "secondary"):
+            set_layout("desktop"); st.rerun()
+    with lc2:
+        if st.button("📱  Mobile", use_container_width=True,
+                     type="primary" if not is_desktop else "secondary"):
+            set_layout("mobile"); st.rerun()
 
-with st.spinner("Gathering the latest…"):
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Gather + filter articles
+# ─────────────────────────────────────────────────────────────────────────────
+calm_set = set(calm)
+if view == CALM_VIEW:
+    targets = tuple((n, u, folder) for folder, items in feeds.items()
+                    for n, u in items if n in calm_set)
+elif view in (TODAY, ALL):
+    targets = tuple((n, u, folder) for folder, items in feeds.items() for n, u in items)
+else:
+    targets = tuple((n, u, view) for n, u in feeds.get(view, []))
+
+with st.spinner("Fetching…"):
     articles = fetch(targets)
 
 if view == TODAY:
     today = datetime.now().date()
     articles = [a for a in articles if a["time"] and a["time"].astimezone().date() == today]
 
-for a in articles:
-    a["id"] = aid(a["link"])
-
+# Deduplicate
 seen, deduped = set(), []
 for a in articles:
-    if a["id"] in seen:
-        continue
-    seen.add(a["id"]); deduped.append(a)
+    a["id"] = aid(a["link"])
+    if a["id"] not in seen:
+        seen.add(a["id"]); deduped.append(a)
 articles = deduped
 
 if source != ALL_SOURCES:
@@ -506,159 +791,281 @@ if source != ALL_SOURCES:
 
 saved_n = sum(1 for a in articles if a["id"] in starred_set)
 
-# ----------------------------------------------------------------------------
-# Masthead + Show switch + search
-# ----------------------------------------------------------------------------
-title_txt = source if source != ALL_SOURCES else view
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Masthead
+# ─────────────────────────────────────────────────────────────────────────────
 _now = datetime.now()
-dateline = f"{_now:%A} {_now.day} {_now:%B %Y}"
-_h = _now.hour
-if 5 <= _h < 12:
-    _pre, _suf, _tod = "Good morning,", "", "morning"
-elif 12 <= _h < 18:
-    _pre, _suf, _tod = "Good afternoon,", "", "afternoon"
-elif 18 <= _h < 23:
-    _pre, _suf, _tod = "Good evening,", "", "evening"
-else:
-    _pre, _suf, _tod = "Still up,", "?", "night"
+_h   = _now.hour
+if   5 <= _h < 12:  _pre = "Good morning,"
+elif 12 <= _h < 18: _pre = "Good afternoon,"
+elif 18 <= _h < 23: _pre = "Good evening,"
+else:               _pre = "Still up,"
+
+title_txt = source if source != ALL_SOURCES else view
+dateline  = _now.strftime("%A %-d %B %Y")
+
 st.html(
-    f'<div class="greet tod-{_tod}"><span class="orb"></span>'
-    f'<span class="gtext"><span class="gpre">{_pre}</span> '
-    f'<span class="gname">{html.escape(USER_NAME)}</span>{_suf}</span></div>'
-    f'<div class="edhead"><div class="dateline"><b>{html.escape(title_txt)}</b> &nbsp;·&nbsp; {dateline} '
-    f'&nbsp;·&nbsp; <b>{len(articles)}</b> stories &nbsp;·&nbsp; <b>{saved_n}</b> saved</div>'
-    f'<div class="rule"></div></div>')
+    f'<div class="greet">'
+    f'<span class="greet-pre">{_pre}</span> '
+    f'<span class="greet-name">{html.escape(USER_NAME)}</span>'
+    f'</div>'
+    f'<div class="masthead-meta">'
+    f'{html.escape(title_txt)} &nbsp;·&nbsp; {dateline}'
+    f' &nbsp;·&nbsp; {len(articles)} stories &nbsp;·&nbsp; {saved_n} saved'
+    f'</div>'
+    f'<div class="masthead-rule"></div>'
+)
 
-show = st.segmented_control("Show", ["All", "Starred"], default="All", label_visibility="collapsed") or "All"
-query = st.text_input("Search", placeholder="Search headlines and summaries…", label_visibility="collapsed")
+col_show, col_search = st.columns([1, 3], gap="small")
+with col_show:
+    show = st.segmented_control("Show", ["All", "Saved"], default="All",
+                                label_visibility="collapsed") or "All"
+with col_search:
+    query = st.text_input("Search", placeholder="Search headlines…",
+                          label_visibility="collapsed")
 
-if show == "Starred":
+if show == "Saved":
     articles = [a for a in articles if a["id"] in starred_set]
 if query:
     q = query.lower()
     articles = [a for a in articles if q in a["title"].lower() or q in a["summary"].lower()]
 
 
-# ----------------------------------------------------------------------------
-# Visual builders
-# ----------------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────────────────────
+# HTML builders
+# ─────────────────────────────────────────────────────────────────────────────
 def _kicker(a):
     star = ' <span class="star">★</span>' if a["id"] in starred_set else ""
-    return (f'<div class="kicker">{icon_html(a["source"])}<span>{html.escape(a["source"])}</span>'
-            f'<span class="dot">·</span><span class="ago">{relative(a["time"])}</span>{star}</div>')
+    return (f'<div class="kicker">{icon_html(a["source"])}'
+            f'<span>{html.escape(a["source"])}</span>'
+            f'<span class="dot">·</span>'
+            f'<span class="ago">{relative(a["time"])}</span>{star}</div>')
 
 
 def _chip(a):
     star = '<span class="star">★</span>' if a["id"] in starred_set else ""
-    return (f'<div class="chip">{icon_html(a["source"])}{html.escape(a["source"])}'
+    return (f'<div class="chip">{icon_html(a["source"])}'
+            f'<span>{html.escape(a["source"])}</span>'
             f'<span class="ago">· {relative(a["time"])}</span>{star}</div>')
 
 
-def feature_html(a, cover=False):
+def feature_html(a, size="mid"):
     img = (a["image"] or "").replace("'", "%27")
-    cv = " cover" if cover else ""
-    dek = f'<div class="fdek">{html.escape(a["summary"][:200])}</div>' if cover and a["summary"] else ""
-    return (f'<a class="feature{cv}" href="{html.escape(a["link"], quote=True)}" target="_blank" rel="noopener noreferrer">'
-            f'<div class="bg" style="background-color:{color_for(a["source"])};background-image:url(\'{html.escape(img, quote=True)}\')"></div>'
-            f'<div class="plate">{_kicker(a)}'
-            f'<div class="ft">{html.escape(a["title"])}</div>{dek}</div></a>')
+    dek = ""
+    if size == "cover" and a["summary"]:
+        dek = f'<div class="fdek">{html.escape(a["summary"][:220])}</div>'
+    return (
+        f'<a class="feature {size}" href="{html.escape(a["link"], quote=True)}"'
+        f' target="_blank" rel="noopener noreferrer">'
+        f'<div class="bg" style="background-color:{color_for(a["source"])};'
+        f'background-image:url(\'{html.escape(img, quote=True)}\')"></div>'
+        f'<div class="plate">{_kicker(a)}'
+        f'<div class="ft">{html.escape(a["title"])}</div>{dek}</div></a>'
+    )
 
 
-def panel_html(a, cover=False):
-    cv = " cover" if cover else ""
-    dek = f'<div class="pdek">{html.escape(a["summary"][:240])}</div>'
-    return (f'<a class="panel{cv}" href="{html.escape(a["link"], quote=True)}" target="_blank" rel="noopener noreferrer" '
-            f'style="--c:{color_for(a["source"])}">{_kicker(a)}'
-            f'<div class="pt">{html.escape(a["title"])}</div>{dek}</a>')
+def panel_html(a, size="mid"):
+    dek = f'<div class="pdek">{html.escape(a["summary"][:240])}</div>' if a["summary"] else ""
+    return (
+        f'<a class="panel {size}" href="{html.escape(a["link"], quote=True)}"'
+        f' target="_blank" rel="noopener noreferrer"'
+        f' style="--c:{color_for(a["source"])}">'
+        f'{_kicker(a)}'
+        f'<div class="pt">{html.escape(a["title"])}</div>{dek}</a>'
+    )
 
 
-def small_html(a, compact=False):
-    cp = " compact" if compact else ""
+def card_html(a):
     link = html.escape(a["link"], quote=True)
     if a["image"]:
         img = html.escape(a["image"], quote=True)
-        ph = f"<div class='media ph' style='background:{color_for(a['source'])}'>{html.escape(initials(a['source']))}</div>"
+        ph  = (f"<div class='media ph' style='background:{color_for(a[\"source\"])}'>"
+               f"{html.escape(initials(a['source']))}</div>")
         media = f'<img class="media" src="{img}" loading="lazy" onerror="this.outerHTML=&quot;{ph}&quot;">'
-        return (f'<a class="cardlink{cp}" href="{link}" target="_blank" rel="noopener noreferrer">'
+        return (f'<a class="cardlink" href="{link}" target="_blank" rel="noopener noreferrer">'
                 f'{media}<div class="ctitle">{html.escape(a["title"])}</div>{_chip(a)}</a>')
     accent = f'<div class="accent" style="background:{color_for(a["source"])}"></div>'
-    return (f'<a class="cardlink text{cp}" href="{link}" target="_blank" rel="noopener noreferrer">'
+    return (f'<a class="cardlink text" href="{link}" target="_blank" rel="noopener noreferrer">'
             f'{accent}<div class="ctitle">{html.escape(a["title"])}</div>{_chip(a)}</a>')
+
+
+def mobile_card_html(a, lead=False):
+    link  = html.escape(a["link"], quote=True)
+    color = color_for(a["source"])
+    kicker = (f'<div class="kicker" style="color:{color}">'
+              f'{icon_html(a["source"])}'
+              f'<span>{html.escape(a["source"])}</span>'
+              f'<span class="dot">·</span>'
+              f'<span class="ago">{relative(a["time"])}</span>'
+              f'{"<span class=star>★</span>" if a["id"] in starred_set else ""}'
+              f'</div>')
+    if lead and a["image"]:
+        img   = html.escape(a["image"], quote=True)
+        ph    = (f'<div class="thumb-ph" style="background:{color}">'
+                 f'{html.escape(initials(a["source"]))}</div>')
+        thumb = f'<img class="thumb" src="{img}" loading="lazy" onerror="this.outerHTML=&quot;{ph}&quot;">'
+        return (f'<a class="mcard-lead" href="{link}" target="_blank" rel="noopener noreferrer">'
+                f'{thumb}'
+                f'<div class="body">{kicker}'
+                f'<div class="mt">{html.escape(a["title"])}</div></div></a>')
+    return (f'<a class="mcard" href="{link}" target="_blank" rel="noopener noreferrer">'
+            f'{kicker}<div class="mt">{html.escape(a["title"])}</div></a>')
 
 
 def actions(a):
     is_star = a["id"] in starred_set
-    st.button("★ Saved" if is_star else "☆ Save", key=f"s_{a['id']}", on_click=toggle_star, args=(a["id"],))
+    st.button("★ Saved" if is_star else "☆ Save",
+              key=f"s_{a['id']}", on_click=toggle_star, args=(a["id"],))
 
 
-def big(a, cover=False):
-    """A wide tile: photo-overlay feature, or colour-washed text panel."""
+def section_header(label):
+    st.html(f'<div class="section-rule">'
+            f'<span class="label">{html.escape(label)}</span>'
+            f'<span class="line"></span></div>')
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Desktop layout helpers
+# ─────────────────────────────────────────────────────────────────────────────
+def render_big(a, size="mid"):
     with st.container(border=False):
-        st.html(feature_html(a, cover) if a["image"] else panel_html(a, cover))
+        st.html(feature_html(a, size) if a["image"] else panel_html(a, size))
         actions(a)
 
 
-def small(a, compact=False):
+def render_small(a):
     with st.container(border=True):
-        st.html(small_html(a, compact))
+        st.html(card_html(a))
         actions(a)
 
 
-# ----------------------------------------------------------------------------
-# Render — editorial rhythm
-# ----------------------------------------------------------------------------
-if not articles:
-    msg = {
-        "Starred": "No saved stories yet. Tap Save on anything you want to keep.",
-    }.get(show, "Nothing to show. Try another view, clear the search, or refresh.")
-    st.html(f'<div class="empty"><div class="big">Nothing here</div>{msg}</div>')
-else:
-    items = articles[:DISPLAY_LIMIT]
-    cover = next((a for a in items if a["image"]), items[0])  # cover prefers a photo
-    rest = [a for a in items if a is not cover]
+def render_section_desktop(folder_items, is_first=False):
+    """
+    Layout for one section (folder) in desktop view.
+    5 diverse articles, variable card sizes:
+      - Article 0: full-width cover (large)
+      - Articles 1-2: side-by-side medium tiles
+      - Articles 3-4: row of 2 small cards
+    """
+    items = diverse_section(folder_items)
+    if not items:
+        return
 
+    # Card 0 — cover
+    render_big(items[0], size="cover" if is_first else "mid")
     st.write("")
-    big(cover, cover=True)
-    st.write("")
 
-    # Even 3-up rows keep columns balanced; a full-width feature band adds rhythm
-    # without leaving a gap (it has no neighbour). No more mismatched 2-1 splits.
-    pattern = ["trio", "trio", "band", "trio", "pair", "trio"]
-    i, p, n = 0, 0, len(rest)
-    while i < n:
-        block = pattern[p % len(pattern)]
-        p += 1
-        left = n - i
-
-        if left <= 2:  # tidy finish: 1 band, or a balanced pair
-            if left == 1:
-                big(rest[i])
-            else:
-                c1, c2 = st.columns(2, gap="medium")
-                with c1:
-                    small(rest[i])
-                with c2:
-                    small(rest[i + 1])
-            i += left
-            break
-
-        if block == "band":
-            big(rest[i]); i += 1
-        elif block == "pair":
-            chunk = rest[i:i + 2]; i += 2
-            c1, c2 = st.columns(2, gap="medium")
-            with c1:
-                big(chunk[0])
-            with c2:
-                big(chunk[1])
-        else:  # trio
-            chunk = rest[i:i + 3]; i += 3
-            cols = st.columns(3, gap="medium")
-            for k, a in enumerate(chunk):
-                with cols[k]:
-                    small(a)
+    # Cards 1-2 — medium pair (if we have them)
+    if len(items) >= 3:
+        c1, c2 = st.columns(2, gap="medium")
+        with c1: render_big(items[1], size="mid")
+        with c2: render_big(items[2], size="mid")
         st.write("")
 
+    # Cards 3-4 — small trio or pair
+    tail = items[3:]
+    if tail:
+        cols = st.columns(len(tail), gap="medium")
+        for col, a in zip(cols, tail):
+            with col: render_small(a)
+        st.write("")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Mobile layout helpers
+# ─────────────────────────────────────────────────────────────────────────────
+def render_section_mobile(folder_items):
+    """
+    Compact list for mobile: lead card with thumbnail, then plain list items.
+    """
+    items = diverse_section(folder_items)
+    if not items:
+        return
+
+    # Lead card
+    st.html(mobile_card_html(items[0], lead=True))
+    actions(items[0])
+
+    # Rest as compact list cards
+    for a in items[1:]:
+        st.html(mobile_card_html(a, lead=False))
+        actions(a)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Render
+# ─────────────────────────────────────────────────────────────────────────────
+if not articles:
+    msg = ("No saved stories yet — tap Save on anything you want to keep."
+           if show == "Saved"
+           else "Nothing here. Try a different view, clear the search, or refresh.")
+    st.html(f'<div class="empty"><div class="big">Nothing here</div>{msg}</div>')
+
+else:
+    items       = articles[:DISPLAY_LIMIT]
+    mobile_mode = st.session_state.layout == "mobile"
+    use_grouped = view in (ALL, TODAY, CALM_VIEW) and source == ALL_SOURCES
+
+    if use_grouped:
+        grouped: dict = OrderedDict()
+        for a in items:
+            grouped.setdefault(a.get("folder", "Other"), []).append(a)
+
+        for idx, (folder, folder_items) in enumerate(grouped.items()):
+            if not folder_items:
+                continue
+            section_header(folder)
+            if mobile_mode:
+                render_section_mobile(folder_items)
+            else:
+                render_section_desktop(folder_items, is_first=(idx == 0))
+
+    else:
+        # Single-folder / single-source: classic magazine rhythm on desktop,
+        # simple list on mobile
+        if mobile_mode:
+            for a in items:
+                st.html(mobile_card_html(a, lead=bool(a["image"])))
+                actions(a)
+        else:
+            cover = next((a for a in items if a["image"]), items[0])
+            rest  = [a for a in items if a is not cover]
+
+            render_big(cover, size="cover")
+            st.write("")
+
+            pattern = ["trio", "trio", "band", "trio", "pair", "trio"]
+            i, p, n = 0, 0, len(rest)
+            while i < n:
+                block = pattern[p % len(pattern)]
+                p += 1
+                left  = n - i
+                if left <= 2:
+                    if left == 1:
+                        render_big(rest[i])
+                    else:
+                        c1, c2 = st.columns(2, gap="medium")
+                        with c1: render_small(rest[i])
+                        with c2: render_small(rest[i + 1])
+                    i += left
+                    break
+                if block == "band":
+                    render_big(rest[i]); i += 1
+                elif block == "pair":
+                    chunk = rest[i:i + 2]; i += 2
+                    c1, c2 = st.columns(2, gap="medium")
+                    with c1: render_big(chunk[0])
+                    with c2: render_big(chunk[1])
+                else:
+                    chunk = rest[i:i + 3]; i += 3
+                    cols  = st.columns(3, gap="medium")
+                    for k, a in enumerate(chunk):
+                        with cols[k]: render_small(a)
+                st.write("")
+
     if len(articles) > DISPLAY_LIMIT:
-        st.html(f'<div class="more">Showing the {DISPLAY_LIMIT} most recent of {len(articles)}. '
-                    f"Pick a source or search to see more.</div>")
+        st.html(
+            f'<div class="more">Showing {DISPLAY_LIMIT} of {len(articles)} stories. '
+            f'Pick a folder or search to go deeper.</div>'
+        )
