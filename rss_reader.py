@@ -585,14 +585,40 @@ header[data-testid="stHeader"]  { background: transparent; }
 }
 .cardlink { display:block; text-decoration:none; color:inherit; }
 .cardlink.read { opacity:.44; }
-.cardlink .media {
-  width:100%; aspect-ratio:16/10; object-fit:cover;
-  border-radius:9px; display:block;
+
+/* img-wrap: stacks placeholder and real image, shows placeholder if img errors */
+.img-wrap {
+  position:relative; width:100%; aspect-ratio:16/10;
+  border-radius:9px; overflow:hidden;
 }
-.cardlink .ph {
+.img-wrap .ph {
+  position:absolute; inset:0;
   display:grid; place-items:center;
   color:#fff; font-weight:800; font-size:1.25rem;
 }
+.img-wrap .over {
+  position:absolute; inset:0;
+  width:100%; height:100%; object-fit:cover;
+  border-radius:9px;
+}
+.img-wrap .over.broken { display:none; }
+
+/* thumb variant for mobile lead cards */
+.thumb-wrap {
+  position:relative; width:78px; height:64px;
+  border-radius:8px; overflow:hidden; flex:none;
+}
+.thumb-wrap .ph {
+  position:absolute; inset:0;
+  display:grid; place-items:center;
+  color:#fff; font-weight:800; font-size:1.1rem;
+}
+.thumb-wrap .over {
+  position:absolute; inset:0;
+  width:100%; height:100%; object-fit:cover;
+}
+.thumb-wrap .over.broken { display:none; }
+
 .cardlink .accent { height:3px; width:32px; border-radius:3px; margin:.1rem 0 .42rem; }
 .ctitle {
   font-family:var(--serif); font-weight:700; font-size:.97rem;
@@ -625,15 +651,7 @@ header[data-testid="stHeader"]  { background: transparent; }
   box-shadow:var(--shadow);
   text-decoration:none; color:var(--ink);
 }
-.mcard-lead .thumb {
-  width:78px; height:64px; border-radius:8px; flex:none;
-  object-fit:cover; background:var(--surface);
-}
-.mcard-lead .thumb-ph {
-  width:78px; height:64px; border-radius:8px; flex:none;
-  display:grid; place-items:center;
-  font-weight:800; font-size:1.1rem; color:#fff;
-}
+/* thumb handled by .thumb-wrap above */
 .mcard-lead .body { flex:1; min-width:0; }
 .mcard-lead .mt {
   font-family:var(--serif); font-weight:700; font-size:.97rem;
@@ -876,16 +894,31 @@ def panel_html(a, size="mid"):
     )
 
 
+def img_with_fallback(img_url, color, inits, css_class="media"):
+    """
+    Renders image with an always-in-DOM colour-plate fallback.
+    The real img sits on top (position:absolute); when it errors,
+    JS adds class 'broken' which hides it, revealing the plate below.
+    """
+    img      = html.escape(img_url, quote=True)
+    wrap_cls = "thumb-wrap" if css_class == "thumb" else "img-wrap"
+    on_err   = "this.classList.add('broken')"
+    return (
+        f'<div class="{wrap_cls}">'
+        f'<div class="ph" style="background:{color}">{inits}</div>'
+        f'<img class="over" src="{img}" loading="lazy" onerror="{on_err}">'
+        f'</div>'
+    )
+
+
 def card_html(a):
-    link    = html.escape(a["link"], quote=True)
-    title   = html.escape(a["title"])
-    src     = a["source"]
-    color   = color_for(src)
-    inits   = html.escape(initials(src))
+    link  = html.escape(a["link"], quote=True)
+    title = html.escape(a["title"])
+    src   = a["source"]
+    color = color_for(src)
+    inits = html.escape(initials(src))
     if a["image"]:
-        img   = html.escape(a["image"], quote=True)
-        ph    = f"<div class='media ph' style='background:{color}'>{inits}</div>"
-        media = f'<img class="media" src="{img}" loading="lazy" onerror="this.outerHTML=&quot;{ph}&quot;">'
+        media = img_with_fallback(a["image"], color, inits, css_class="media")
         return (f'<a class="cardlink" href="{link}" target="_blank" rel="noopener noreferrer">'
                 f'{media}<div class="ctitle">{title}</div>{_chip(a)}</a>')
     accent = f'<div class="accent" style="background:{color}"></div>'
@@ -900,23 +933,22 @@ def mobile_card_html(a, lead=False):
     color  = color_for(src)
     inits  = html.escape(initials(src))
     src_e  = html.escape(src)
-    star   = "<span class='star'>★</span>" if a["id"] in starred_set else ""
+    star   = "<span class='star'>&#9733;</span>" if a["id"] in starred_set else ""
     kicker = (f'<div class="kicker" style="color:{color}">'
               f'{icon_html(src)}'
               f'<span>{src_e}</span>'
-              f'<span class="dot">·</span>'
+              f'<span class="dot">&middot;</span>'
               f'<span class="ago">{relative(a["time"])}</span>'
               f'{star}</div>')
     if lead and a["image"]:
-        img   = html.escape(a["image"], quote=True)
-        ph    = f'<div class="thumb-ph" style="background:{color}">{inits}</div>'
-        thumb = f'<img class="thumb" src="{img}" loading="lazy" onerror="this.outerHTML=&quot;{ph}&quot;">'
+        thumb = img_with_fallback(a["image"], color, inits, css_class="thumb")
         return (f'<a class="mcard-lead" href="{link}" target="_blank" rel="noopener noreferrer">'
                 f'{thumb}'
                 f'<div class="body">{kicker}'
                 f'<div class="mt">{title}</div></div></a>')
     return (f'<a class="mcard" href="{link}" target="_blank" rel="noopener noreferrer">'
             f'{kicker}<div class="mt">{title}</div></a>')
+
 
 
 def actions(a):
