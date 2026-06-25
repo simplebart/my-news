@@ -24,6 +24,7 @@ from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
+import urllib.request
 import feedparser
 import streamlit as st
 
@@ -64,6 +65,7 @@ EXCLUDE_KEYWORDS = {
     "Wired": [
         "review", "best", "buying guide", "how to", "deal", "deals",
         "discount", "sale", "gear", "tested", "gift guide",
+        "coupon", "promo",
     ],
 }
 
@@ -226,6 +228,30 @@ IMG_RE = re.compile(r'<img[^>]+src=["\']([^"\']+)', re.IGNORECASE)
 # Patterns that indicate a low-quality/thumbnail image URL
 BAD_IMG_RE = re.compile(r'(ichef\.bbci\.co\.uk/news/\d+/|i\.guim\.co\.uk/.*?w=\d{1,3}[^0-9])', re.IGNORECASE)
 
+# Sources that block og:image scraping — skip the attempt entirely
+NO_SCRAPE_SOURCES = {"FT", "FT Opinion", "FT Alphaville", "The Economist",
+                     "The Economist Leaders", "MarketWatch"}
+
+OG_RE = re.compile(r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)', re.IGNORECASE)
+OG_RE2 = re.compile(r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\'][^>]*>', re.IGNORECASE)
+
+
+def scrape_og_image(url):
+    """Fetch og:image from an article URL. Returns None on any failure."""
+    try:
+        req = urllib.request.Request(
+            url,
+            headers={"User-Agent": "Mozilla/5.0 (compatible; Aurora/1.0)"},
+        )
+        with urllib.request.urlopen(req, timeout=4) as resp:
+            # Only read first 12KB — og:image is always in <head>
+            chunk = resp.read(12288).decode("utf-8", errors="ignore")
+        m = OG_RE.search(chunk) or OG_RE2.search(chunk)
+        return m.group(1) if m else None
+    except Exception:
+        return None
+
+
 def clean_text(raw):
     return " ".join(html.unescape(TAG_RE.sub(" ", raw or "")).split())
 
@@ -298,13 +324,30 @@ def _fetch_one(args):
     return out[:cap]
 
 
+def _scrape_one(article):
+    """Fill in missing image via og:image scrape. Mutates in place."""
+    if article["image"] is None and article["source"] not in NO_SCRAPE_SOURCES:
+        article["image"] = scrape_og_image(article["link"])
+    return article
+
+
 @st.cache_data(ttl=900, show_spinner=False)
 def fetch(targets):
+    # Step 1: fetch all feeds in parallel
     items = []
     with ThreadPoolExecutor(max_workers=8) as pool:
         for chunk in pool.map(_fetch_one, list(targets)):
             items.extend(chunk)
     items.sort(key=lambda a: a["time"] or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+
+    # Step 2: scrape og:image for articles that have no image yet
+    # Run in parallel with a capped pool so it stays fast
+    needs_scrape = [a for a in items if a["image"] is None
+                    and a["source"] not in NO_SCRAPE_SOURCES]
+    if needs_scrape:
+        with ThreadPoolExecutor(max_workers=12) as pool:
+            list(pool.map(_scrape_one, needs_scrape))
+
     return items
 
 
