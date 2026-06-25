@@ -63,7 +63,7 @@ EXCLUDE_KEYWORDS = {
     ],
     "Wired": [
         "review", "best", "buying guide", "how to", "deal", "deals",
-        "discount", "sale", "gear", "tested", "gift guide", "coupon", 
+        "discount", "sale", "gear", "tested", "gift guide", "coupon", "promo",
     ],
 }
 
