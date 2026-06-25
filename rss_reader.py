@@ -31,8 +31,14 @@ import streamlit as st
 # Config
 # ─────────────────────────────────────────────────────────────────────────────
 
-# How many articles to fetch per individual feed (keeps BBC/Guardian from flooding)
+# How many articles to fetch per individual feed (global default)
 MAX_PER_FEED = 8
+
+# Per-source fetch cap overrides (lower = less noise from high-volume sources)
+MAX_PER_FEED_OVERRIDES = {
+    "The Verge": 4,
+    "Wired":     4,
+}
 
 # How many articles to show per section in the grouped view
 SECTION_SIZE = 5
@@ -46,6 +52,20 @@ USER_NAME     = "Bart"
 # Sources whose images are frequently low-res thumbnails — skip their images
 # and fall back to the colour-plate treatment instead.
 LOW_RES_SOURCES = {"BBC News", "BBC Europe", "BBC Sport Football", "The Guardian", "The Guardian Film"}
+
+# Keywords to filter out per source (case-insensitive, matched against title).
+# Articles whose title contains any of these words are silently skipped.
+EXCLUDE_KEYWORDS = {
+    "The Verge": [
+        "prime day", "deal", "deals", "review", "hands-on", "hands on",
+        "best", "discount", "sale", "unboxing", "how to", "versus", " vs ",
+        "giveaway", "buy", "price", "cheap", "gift guide",
+    ],
+    "Wired": [
+        "review", "best", "buying guide", "how to", "deal", "deals",
+        "discount", "sale", "gear", "tested", "gift guide",
+    ],
+}
 
 DEFAULT_FEEDS = {
     "Daily news": [
@@ -64,6 +84,7 @@ DEFAULT_FEEDS = {
     ],
     "Tech": [
         ("The Verge",       "https://www.theverge.com/rss/index.xml"),
+        ("Wired",           "https://www.wired.com/feed/rss"),
         ("Ars Technica",    "https://feeds.arstechnica.com/arstechnica/index"),
         ("MIT Tech Review", "https://www.technologyreview.com/feed/"),
     ],
@@ -103,6 +124,7 @@ ACCENTS = {
     "MarketWatch":            "#007F5F",
     "The Verge":              "#7C3AED",
     "Ars Technica":           "#FF4E00",
+    "Wired":                  "#000000",
     "MIT Tech Review":        "#111111",
     "Pitchfork":              "#1A1A1A",
     "Dezeen":                 "#111111",
@@ -244,15 +266,27 @@ def entry_time(entry):
     return None
 
 
+def _is_excluded(title, source):
+    keywords = EXCLUDE_KEYWORDS.get(source, [])
+    if not keywords:
+        return False
+    title_lower = title.lower()
+    return any(kw in title_lower for kw in keywords)
+
+
 def _fetch_one(args):
     name, url, folder = args
+    cap = MAX_PER_FEED_OVERRIDES.get(name, MAX_PER_FEED)
     out = []
     try:
         for e in feedparser.parse(url).entries:
+            title = clean_text(e.get("title", "Untitled"))
+            if _is_excluded(title, name):
+                continue
             out.append({
                 "source":  name,
                 "folder":  folder,
-                "title":   clean_text(e.get("title", "Untitled")),
+                "title":   title,
                 "link":    e.get("link", "#"),
                 "summary": clean_text(e.get("summary", "")),
                 "image":   extract_image(e, name),
@@ -261,7 +295,7 @@ def _fetch_one(args):
     except Exception:
         pass
     out.sort(key=lambda a: a["time"] or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
-    return out[:MAX_PER_FEED]
+    return out[:cap]
 
 
 @st.cache_data(ttl=900, show_spinner=False)
