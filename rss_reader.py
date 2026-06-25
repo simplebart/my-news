@@ -63,7 +63,7 @@ EXCLUDE_KEYWORDS = {
     ],
     "Wired": [
         "review", "best", "buying guide", "how to", "deal", "deals",
-        "discount", "sale", "gear", "tested", "gift guide", "coupon", "promo",
+        "discount", "sale", "gear", "tested", "gift guide",
     ],
 }
 
@@ -660,38 +660,95 @@ header[data-testid="stHeader"]  { background: transparent; }
   display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;
 }
 
-/* ── Mobile list card ── */
-.mcard {
-  display:block; text-decoration:none; color:var(--ink);
-  background:var(--card); border:1px solid var(--rule);
-  border-radius:var(--r); padding:.85rem 1rem;
-  margin-bottom:.55rem;
-  box-shadow:var(--shadow);
-  transition:transform .14s;
+/* ── Mobile strip (horizontal scroll per section) ── */
+.strip-wrap {
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  margin: 0 -1rem;
+  padding: 0 1rem .5rem;
 }
-.mcard:hover { transform:translateX(3px); }
-.mcard.read  { opacity:.45; }
-.mcard .mt {
-  font-family:var(--serif); font-weight:700; font-size:1rem;
-  line-height:1.28; color:var(--ink); margin:.3rem 0 .38rem;
-  display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;
+.strip-wrap::-webkit-scrollbar { display: none; }
+
+.strip {
+  display: flex;
+  gap: .75rem;
+  width: max-content;
+  padding-bottom: .25rem;
 }
-.mcard .msub { font-size:.7rem; color:var(--ink-3); font-weight:500; }
-.mcard-lead {
-  display:flex; gap:.85rem; align-items:flex-start;
-  background:var(--card); border:1px solid var(--rule);
-  border-radius:var(--r); padding:.9rem 1rem;
-  margin-bottom:.55rem;
-  box-shadow:var(--shadow);
-  text-decoration:none; color:var(--ink);
+
+/* Strip card — tall portrait tile */
+.scard {
+  display: flex;
+  flex-direction: column;
+  width: 200px;
+  flex-shrink: 0;
+  border-radius: var(--r);
+  overflow: hidden;
+  text-decoration: none;
+  color: var(--ink);
+  background: var(--card);
+  border: 1px solid var(--rule);
+  box-shadow: var(--shadow);
+  transition: transform .18s ease;
 }
-/* thumb handled by .thumb-wrap above */
-.mcard-lead .body { flex:1; min-width:0; }
-.mcard-lead .mt {
-  font-family:var(--serif); font-weight:700; font-size:.97rem;
-  line-height:1.28; color:var(--ink); margin:.3rem 0 .35rem;
-  display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;
+.scard:hover { transform: translateY(-3px); }
+.scard.read  { opacity: .45; }
+
+/* Image area — 16:10 top */
+.scard .simg {
+  position: relative;
+  width: 200px;
+  height: 125px;
+  flex-shrink: 0;
+  overflow: hidden;
 }
+.scard .simg .ph {
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  color: #fff; font-weight: 800; font-size: 1.4rem;
+}
+.scard .simg .over {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%; object-fit: cover;
+}
+.scard .simg .over.broken { display: none; }
+
+/* Text body */
+.scard .sbody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: .65rem .75rem .6rem;
+}
+.scard .skicker {
+  display: flex; align-items: center; gap: .32rem;
+  font-size: .6rem; font-weight: 800; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--ink-3);
+  margin-bottom: .3rem;
+}
+.scard .skicker .sico {
+  width: 13px; height: 13px; border-radius: 3px;
+  display: inline-grid; place-items: center;
+  color: #fff; font-size: .42rem; font-weight: 800; flex: none;
+}
+.scard .skicker .sago { color: var(--ink-3); }
+.scard .st {
+  font-family: var(--serif); font-weight: 700;
+  font-size: .88rem; line-height: 1.28;
+  color: var(--ink); flex: 1;
+  display: -webkit-box; -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical; overflow: hidden;
+}
+.scard .ssave {
+  align-self: flex-end;
+  margin-top: .5rem;
+  font-size: .65rem; font-weight: 600;
+  color: var(--ink-3); background: none;
+  border: none; cursor: pointer; padding: 0;
+}
+.scard .ssave.saved { color: var(--gold); }
 
 /* ── Save button ── */
 [data-testid="stMain"] .stButton { display:flex; justify-content:flex-end; margin-top:.32rem; }
@@ -1046,24 +1103,61 @@ def render_section_desktop(folder_items, is_first=False):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Mobile layout helpers
+# Mobile layout helpers — horizontal strip
 # ─────────────────────────────────────────────────────────────────────────────
+def strip_card_html(a):
+    """Single card inside the horizontal strip."""
+    link   = html.escape(a["link"], quote=True)
+    title  = html.escape(a["title"])
+    src    = a["source"]
+    color  = color_for(src)
+    inits  = html.escape(initials(src))
+    src_e  = html.escape(src)
+    ago    = relative(a["time"])
+    on_err = "this.classList.add('broken')"
+
+    # Image or colour plate
+    if a["image"]:
+        img_url = html.escape(a["image"], quote=True)
+        img_block = (
+            f'<div class="simg">'
+            f'<div class="ph" style="background:{color}">{inits}</div>'
+            f'<img class="over" src="{img_url}" loading="lazy" onerror="{on_err}">'
+            f'</div>'
+        )
+    else:
+        img_block = (
+            f'<div class="simg">'
+            f'<div class="ph" style="background:{color}">{inits}</div>'
+            f'</div>'
+        )
+
+    return (
+        f'<a class="scard" href="{link}" target="_blank" rel="noopener noreferrer">'
+        f'{img_block}'
+        f'<div class="sbody">'
+        f'<div class="skicker">'
+        f'<span class="sico" style="background:{color}">{inits}</span>'
+        f'<span>{src_e}</span>'
+        f'<span class="sago">&middot; {ago}</span>'
+        f'</div>'
+        f'<div class="st">{title}</div>'
+        f'</div></a>'
+    )
+
+
 def render_section_mobile(folder_items):
-    """
-    Compact list for mobile: lead card with thumbnail, then plain list items.
-    """
+    """Horizontal scrolling strip of cards per section."""
     items = diverse_section(folder_items)
     if not items:
         return
 
-    # Lead card
-    st.html(mobile_card_html(items[0], lead=True))
-    actions(items[0])
-
-    # Rest as compact list cards
-    for a in items[1:]:
-        st.html(mobile_card_html(a, lead=False))
-        actions(a)
+    cards_html = "".join(strip_card_html(a) for a in items)
+    st.html(
+        f'<div class="strip-wrap">'
+        f'<div class="strip">{cards_html}</div>'
+        f'</div>'
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1096,11 +1190,14 @@ else:
 
     else:
         # Single-folder / single-source: classic magazine rhythm on desktop,
-        # simple list on mobile
+        # horizontal strip on mobile
         if mobile_mode:
-            for a in items:
-                st.html(mobile_card_html(a, lead=bool(a["image"])))
-                actions(a)
+            cards_html = "".join(strip_card_html(a) for a in items)
+            st.html(
+                '<div class="strip-wrap">'
+                f'<div class="strip">{cards_html}</div>'
+                '</div>'
+            )
         else:
             cover = next((a for a in items if a["image"]), items[0])
             rest  = [a for a in items if a is not cover]
