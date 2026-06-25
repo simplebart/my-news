@@ -63,7 +63,7 @@ EXCLUDE_KEYWORDS = {
     ],
     "Wired": [
         "review", "best", "buying guide", "how to", "deal", "deals",
-        "discount", "sale", "gear", "tested", "gift guide", "coupon", "promo",
+        "discount", "sale", "gear", "tested", "gift guide", "coupon", 
     ],
 }
 
@@ -827,8 +827,9 @@ with st.spinner("Fetching…"):
     articles = fetch(targets)
 
 if view == TODAY:
-    today = datetime.now().date()
-    articles = [a for a in articles if a["time"] and a["time"].astimezone().date() == today]
+    from datetime import timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    articles = [a for a in articles if a["time"] and a["time"] >= cutoff]
 
 # Deduplicate
 seen, deduped = set(), []
