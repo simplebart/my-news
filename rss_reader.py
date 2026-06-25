@@ -367,18 +367,29 @@ def relative(dt):
 # ─────────────────────────────────────────────────────────────────────────────
 def diverse_section(articles, n=SECTION_SIZE, max_per_source=MAX_PER_SOURCE_IN_SECTION):
     """
-    From a list sorted by recency, pick up to n articles ensuring no single
-    source appears more than max_per_source times.
+    Pick n articles with source diversity: max max_per_source per source.
+    If diversity rules leave us short of n, top up with remaining articles
+    regardless of source so the section always has n items.
     """
     counts = {}
     picked = []
+    leftover = []
     for a in articles:
         src = a["source"]
         if counts.get(src, 0) < max_per_source:
             counts[src] = counts.get(src, 0) + 1
             picked.append(a)
             if len(picked) == n:
-                break
+                return picked
+        else:
+            leftover.append(a)
+    # Top up with leftovers if we still need more
+    seen_ids = {id(a) for a in picked}
+    for a in leftover:
+        if len(picked) >= n:
+            break
+        if id(a) not in seen_ids:
+            picked.append(a)
     return picked
 
 
