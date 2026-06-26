@@ -495,6 +495,10 @@ header[data-testid="stHeader"] { background:transparent; }
 .brand .name { font-family:var(--serif); font-weight:700; font-size:1.22rem; letter-spacing:-.01em; }
 .sidebar-cap { font-size:.67rem; letter-spacing:.10em; text-transform:uppercase; color:var(--ink-3); font-weight:700; margin:.9rem 0 -.1rem; }
 
+/* Bigger radio labels in sidebar */
+[data-testid="stSidebar"] [data-testid="stRadio"] label p { font-size:.95rem !important; font-weight:500; }
+[data-testid="stSidebar"] [data-testid="stRadio"] label { padding:.18rem 0; }
+
 /* Widgets */
 .stButton button {
   border-radius:8px; border:1px solid var(--rule);
@@ -1095,6 +1099,11 @@ else:
 
     else:
         # Single folder / source view — magazine rhythm on both desktop and mobile
+        # Back button to Today
+        if st.button("← Today", key="back_to_today"):
+            st.session_state.nav_to = TODAY
+            st.rerun()
+        st.write("")
         cover = next((a for a in items if a["image"]), items[0])
         rest  = [a for a in items if a is not cover]
         render_big(cover, size="cover")
