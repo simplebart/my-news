@@ -69,7 +69,7 @@ EXCLUDE_KEYWORDS = {
         "discount", "sale", "gear", "tested", "gift guide", "coupon", "promo",
     ],
     "Euractiv": [
-      "The hack", "firepower", "voltage", "first aid", "harvest",
+      "Hack", "firepower", "voltage", "first aid", "harvest",
     ],
 }
 
