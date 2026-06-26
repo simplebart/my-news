@@ -1094,39 +1094,35 @@ else:
                 render_section_desktop(folder_items, is_first=(idx == 0))
 
     else:
-        # Single folder / source view
-        if mobile_mode:
-            cards = "".join(strip_card_html(a) for a in items)
-            st.html(f'<div class="strip-wrap"><div class="strip">{cards}</div></div>')
-        else:
-            cover = next((a for a in items if a["image"]), items[0])
-            rest  = [a for a in items if a is not cover]
-            render_big(cover, size="cover")
-            st.write("")
-            pattern = ["trio", "trio", "band", "trio", "pair", "trio"]
-            i, p, n = 0, 0, len(rest)
-            while i < n:
-                block = pattern[p % len(pattern)]; p += 1; left = n - i
-                if left <= 2:
-                    if left == 1: render_big(rest[i])
-                    else:
-                        c1, c2 = st.columns(2, gap="medium")
-                        with c1: render_small(rest[i])
-                        with c2: render_small(rest[i+1])
-                    break
-                if block == "band":
-                    render_big(rest[i]); i += 1
-                elif block == "pair":
-                    chunk = rest[i:i+2]; i += 2
-                    c1, c2 = st.columns(2, gap="medium")
-                    with c1: render_big(chunk[0])
-                    with c2: render_big(chunk[1])
+        # Single folder / source view — magazine rhythm on both desktop and mobile
+        cover = next((a for a in items if a["image"]), items[0])
+        rest  = [a for a in items if a is not cover]
+        render_big(cover, size="cover")
+        st.write("")
+        pattern = ["trio", "trio", "band", "trio", "pair", "trio"]
+        i, p, n = 0, 0, len(rest)
+        while i < n:
+            block = pattern[p % len(pattern)]; p += 1; left = n - i
+            if left <= 2:
+                if left == 1: render_big(rest[i])
                 else:
-                    chunk = rest[i:i+3]; i += 3
-                    cols = st.columns(3, gap="medium")
-                    for k, a in enumerate(chunk):
-                        with cols[k]: render_small(a)
-                st.write("")
+                    c1, c2 = st.columns(2, gap="medium")
+                    with c1: render_small(rest[i])
+                    with c2: render_small(rest[i+1])
+                break
+            if block == "band":
+                render_big(rest[i]); i += 1
+            elif block == "pair":
+                chunk = rest[i:i+2]; i += 2
+                c1, c2 = st.columns(2, gap="medium")
+                with c1: render_big(chunk[0])
+                with c2: render_big(chunk[1])
+            else:
+                chunk = rest[i:i+3]; i += 3
+                cols = st.columns(3, gap="medium")
+                for k, a in enumerate(chunk):
+                    with cols[k]: render_small(a)
+            st.write("")
 
     if len(articles) > DISPLAY_LIMIT:
         st.html(f'<div class="more">Showing {DISPLAY_LIMIT} of {len(articles)} stories. '
