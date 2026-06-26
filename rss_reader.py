@@ -745,6 +745,8 @@ all_sources = [s for items in feeds.values() for s, _ in items]
 
 if "layout" not in st.session_state:
     st.session_state.layout = "desktop"
+if "nav_to" not in st.session_state:
+    st.session_state.nav_to = None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -754,7 +756,10 @@ with st.sidebar:
     st.html('<div class="brand"><div class="mark">✦</div><div class="name">Aurora</div></div>')
 
     st.html('<div class="sidebar-cap">Library</div>')
-    view = st.radio("Library", SMART + list(feeds.keys()), label_visibility="collapsed")
+    _nav = st.session_state.pop("nav_to", None)
+    _opts = SMART + list(feeds.keys())
+    _idx  = _opts.index(_nav) if _nav and _nav in _opts else 0
+    view = st.radio("Library", _opts, index=_idx, label_visibility="collapsed")
 
     view_sources = (
         [s for s in calm if s in all_sources] if view == CALM_VIEW
@@ -1000,16 +1005,19 @@ def actions(a):
 
 
 def section_header(label, desktop=True):
+    """Clickable section header — tapping navigates to that folder view."""
     if desktop:
-        st.html(f'<div class="section-rule"><span class="label">{html.escape(label)}</span>'
-                f'<span class="line"></span></div>')
+        col_lbl, col_line = st.columns([2, 8], gap="small")
+        with col_lbl:
+            if st.button(label, key=f"nav_{label}", use_container_width=True):
+                st.session_state.nav_to = label
+                st.rerun()
+        with col_line:
+            st.html('<div style="height:1px;background:var(--rule);margin-top:1.1rem"></div>')
     else:
-        # Mobile: coloured dot + label
-        color = "#888"
-        st.html(f'<div class="m-section-head">'
-                f'<div class="m-section-dot" style="background:{color}"></div>'
-                f'<span class="m-section-label">{html.escape(label)}</span>'
-                f'</div>')
+        if st.button(f"  {label}  →", key=f"nav_{label}", use_container_width=False):
+            st.session_state.nav_to = label
+            st.rerun()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
