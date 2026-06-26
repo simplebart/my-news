@@ -4,14 +4,18 @@ A Streamlit RSS reader art-directed like a magazine.
 
 Run with:  streamlit run aurora_reader.py
 
-Deploy free at:  https://streamlit.io/cloud
-  1. Push this file + requirements.txt to a GitHub repo
-  2. Connect repo at share.streamlit.io
-  3. Done — available on any device, 24/7
-
-Feeds live in feeds.json (auto-created on first run).
-Saved state lives in aurora_state.json.
-Per-section volume cap + source diversity are enforced at render time.
+SETUP (one-time):
+  1. Create a GitHub Gist at https://gist.github.com
+     - Filename: aurora_feeds.json
+     - Content:  {}
+     - Set to Secret
+  2. Create a GitHub token at https://github.com/settings/tokens
+     - Only needs the 'gist' scope
+  3. Add to Streamlit Secrets (.streamlit/secrets.toml):
+     GIST_ID    = "your_gist_id_here"
+     GITHUB_TOKEN = "your_token_here"
+  4. Push aurora_reader.py + requirements.txt to GitHub
+  5. Deploy at share.streamlit.io
 """
 
 import hashlib
@@ -20,42 +24,40 @@ import json
 import os
 import re
 import time
+import urllib.request
+import urllib.parse
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
-import urllib.request
 import feedparser
 import streamlit as st
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Config
+# Config — edit freely, these are your personal preferences
 # ─────────────────────────────────────────────────────────────────────────────
 
-# How many articles to fetch per individual feed (global default)
-MAX_PER_FEED = 8
+MAX_PER_FEED      = 8    # articles fetched per feed (global default)
+SECTION_SIZE      = 5    # articles shown per section
+MAX_PER_SOURCE    = 2    # max from same source per section
+DISPLAY_LIMIT     = 80
+USER_NAME         = "Bart"
 
-# Per-source fetch cap overrides (lower = less noise from high-volume sources)
 MAX_PER_FEED_OVERRIDES = {
     "The Verge": 4,
     "Wired":     4,
 }
 
-# How many articles to show per section in the grouped view
-SECTION_SIZE = 5
+LOW_RES_SOURCES = {
+    "BBC News", "BBC Europe", "BBC Sport Football",
+    "The Guardian", "The Guardian Film",
+}
 
-# Max articles from the same source within one section (diversity cap)
-MAX_PER_SOURCE_IN_SECTION = 2
+NO_SCRAPE_SOURCES = {
+    "FT", "FT Opinion", "FT Alphaville",
+    "The Economist", "The Economist Leaders", "MarketWatch",
+}
 
-DISPLAY_LIMIT = 80
-USER_NAME     = "Bart"
-
-# Sources whose images are frequently low-res thumbnails — skip their images
-# and fall back to the colour-plate treatment instead.
-LOW_RES_SOURCES = {"BBC News", "BBC Europe", "BBC Sport Football", "The Guardian", "The Guardian Film"}
-
-# Keywords to filter out per source (case-insensitive, matched against title).
-# Articles whose title contains any of these words are silently skipped.
 EXCLUDE_KEYWORDS = {
     "The Verge": [
         "prime day", "deal", "deals", "review", "hands-on", "hands on",
@@ -64,8 +66,7 @@ EXCLUDE_KEYWORDS = {
     ],
     "Wired": [
         "review", "best", "buying guide", "how to", "deal", "deals",
-        "discount", "sale", "gear", "tested", "gift guide",
-        "coupon", "promo",
+        "discount", "sale", "gear", "tested", "gift guide", "coupon", "promo",
     ],
 }
 
@@ -75,12 +76,12 @@ DEFAULT_FEEDS = {
         ("BBC Europe",      "https://feeds.bbci.co.uk/news/world/europe/rss.xml"),
         ("The Guardian",    "https://www.theguardian.com/world/rss"),
         ("Politico Europe", "https://www.politico.eu/feed/"),
-        ("DW",              "https://rss.dw.com/rdf/rss-en-top"),
-        ("Euronews",        "https://www.euronews.com/rss?level=theme&name=news"),
+        ("NYT World",       "https://rss.nytimes.com/services/xml/rss/nyt/World.xml"),
     ],
     "Finance": [
         ("FT",              "https://www.ft.com/rss/home"),
         ("FT Opinion",      "https://www.ft.com/rss/opinion"),
+        ("FT Alphaville",   "https://www.ft.com/alphaville?format=rss"),
         ("The Economist",   "https://www.economist.com/finance-and-economics/rss.xml"),
         ("MarketWatch",     "https://feeds.marketwatch.com/marketwatch/topstories/"),
     ],
@@ -91,11 +92,11 @@ DEFAULT_FEEDS = {
         ("MIT Tech Review", "https://www.technologyreview.com/feed/"),
     ],
     "Cultuur": [
-        ("The Guardian Film",  "https://www.theguardian.com/film/rss"),
-        ("Pitchfork",          "https://pitchfork.com/rss/news/"),
-        ("Dezeen",             "https://www.dezeen.com/feed/"),
-        ("It's Nice That",     "https://www.itsnicethat.com/rss"),
-        ("Bon Appétit",        "https://www.bonappetit.com/feed/rss"),
+        ("The Guardian Film", "https://www.theguardian.com/film/rss"),
+        ("Pitchfork",         "https://pitchfork.com/rss/news/"),
+        ("Dezeen",            "https://www.dezeen.com/feed/"),
+        ("It's Nice That",    "https://www.itsnicethat.com/rss"),
+        ("Bon Appétit",       "https://www.bonappetit.com/feed/rss"),
     ],
     "Long reads": [
         ("The Economist Leaders", "https://www.economist.com/leaders/rss.xml"),
@@ -117,16 +118,16 @@ ACCENTS = {
     "The Guardian":           "#0084C6",
     "The Guardian Film":      "#0084C6",
     "Politico Europe":        "#C8141A",
-    "DW":                     "#1A5EA8",
-    "Euronews":               "#0050A0",
+    "NYT World":              "#000000",
     "FT":                     "#0F5499",
     "FT Opinion":             "#0F5499",
+    "FT Alphaville":          "#0F5499",
     "The Economist":          "#E3120B",
     "The Economist Leaders":  "#E3120B",
     "MarketWatch":            "#007F5F",
     "The Verge":              "#7C3AED",
     "Ars Technica":           "#FF4E00",
-    "Wired":                  "#000000",
+    "Wired":                  "#1A1A1A",
     "MIT Tech Review":        "#111111",
     "Pitchfork":              "#1A1A1A",
     "Dezeen":                 "#111111",
@@ -140,32 +141,95 @@ ACCENTS = {
 ALL, TODAY, CALM_VIEW, ALL_SOURCES = "All", "Today", "Calm", "All sources"
 SMART = [TODAY, ALL, CALM_VIEW]
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Gist persistence — feeds saved to a GitHub Gist so they survive restarts
+# Falls back to local file if no Gist credentials are configured
+# ─────────────────────────────────────────────────────────────────────────────
+def _gist_headers():
+    token = st.secrets.get("GITHUB_TOKEN", "")
+    return {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github.v3+json",
+        "Content-Type": "application/json",
+        "User-Agent": "Aurora/1.0",
+    }
+
+
+def _gist_id():
+    return st.secrets.get("GIST_ID", "")
+
+
+def _has_gist():
+    return bool(_gist_id() and st.secrets.get("GITHUB_TOKEN", ""))
+
+
+def _gist_load():
+    try:
+        req = urllib.request.Request(
+            f"https://api.github.com/gists/{_gist_id()}",
+            headers=_gist_headers(),
+        )
+        with urllib.request.urlopen(req, timeout=6) as r:
+            data = json.loads(r.read())
+        content = data["files"]["aurora_feeds.json"]["content"]
+        return json.loads(content)
+    except Exception:
+        return None
+
+
+def _gist_save(payload):
+    try:
+        body = json.dumps({
+            "files": {"aurora_feeds.json": {"content": json.dumps(payload, indent=2)}}
+        }).encode()
+        req = urllib.request.Request(
+            f"https://api.github.com/gists/{_gist_id()}",
+            data=body,
+            headers=_gist_headers(),
+            method="PATCH",
+        )
+        urllib.request.urlopen(req, timeout=6)
+        return True
+    except Exception:
+        return False
+
+
 HERE       = os.path.dirname(os.path.abspath(__file__))
 FEEDS_PATH = os.path.join(HERE, "feeds.json")
 STATE_PATH = os.path.join(HERE, "aurora_state.json")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Persistence
-# ─────────────────────────────────────────────────────────────────────────────
 def load_feeds():
+    # Try Gist first
+    if _has_gist():
+        d = _gist_load()
+        if d and d.get("feeds"):
+            feeds = {fold: [tuple(p) for p in items] for fold, items in d["feeds"].items()}
+            return feeds, d.get("calm", list(DEFAULT_CALM))
+    # Fall back to local file
     try:
         with open(FEEDS_PATH, "r", encoding="utf-8") as f:
             d = json.load(f)
         feeds = {fold: [tuple(p) for p in items] for fold, items in d.get("feeds", {}).items()}
         if feeds:
-            return feeds, d.get("calm", [])
+            return feeds, d.get("calm", list(DEFAULT_CALM))
     except Exception:
         pass
-    save_feeds(DEFAULT_FEEDS, DEFAULT_CALM)
     return {k: list(v) for k, v in DEFAULT_FEEDS.items()}, list(DEFAULT_CALM)
 
 
 def save_feeds(feeds, calm):
+    payload = {
+        "feeds": {k: [list(p) for p in v] for k, v in feeds.items()},
+        "calm":  calm,
+    }
+    if _has_gist():
+        _gist_save(payload)
+    # Always save locally too as backup
     try:
         with open(FEEDS_PATH, "w", encoding="utf-8") as f:
-            json.dump({"feeds": {k: [list(p) for p in v] for k, v in feeds.items()},
-                       "calm": calm}, f, indent=2)
+            json.dump(payload, f, indent=2)
     except Exception:
         pass
 
@@ -173,8 +237,7 @@ def save_feeds(feeds, calm):
 def load_state():
     try:
         with open(STATE_PATH, "r", encoding="utf-8") as f:
-            d = json.load(f)
-        return set(d.get("starred", []))
+            return set(json.load(f).get("starred", []))
     except Exception:
         return set()
 
@@ -188,7 +251,7 @@ def save_state(starred):
 
 
 def aid(link):
-    return hashlib.md5((link or "").encode("utf-8")).hexdigest()[:12]
+    return hashlib.md5((link or "").encode()).hexdigest()[:12]
 
 
 def toggle_star(i):
@@ -203,7 +266,7 @@ def toggle_star(i):
 def color_for(name):
     if name in ACCENTS:
         return ACCENTS[name]
-    h = int(hashlib.md5(name.encode("utf-8")).hexdigest(), 16)
+    h = int(hashlib.md5(name.encode()).hexdigest(), 16)
     return f"hsl({h % 360},52%,46%)"
 
 
@@ -214,71 +277,52 @@ def initials(name):
     return parts[0][:2].upper() if len(parts) == 1 else (parts[0][0] + parts[-1][0]).upper()
 
 
-def icon_html(name):
-    return (f'<span class="ico" style="background:{color_for(name)}">'
+def icon_html(name, size=17):
+    return (f'<span class="ico" style="background:{color_for(name)};'
+            f'width:{size}px;height:{size}px;border-radius:{max(3,size//4)}px">'
             f'{html.escape(initials(name))}</span>')
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Fetch + parse
+# Image helpers
 # ─────────────────────────────────────────────────────────────────────────────
-TAG_RE = re.compile(r"<[^>]+>")
-IMG_RE = re.compile(r'<img[^>]+src=["\']([^"\']+)', re.IGNORECASE)
-
-# Patterns that indicate a low-quality/thumbnail image URL
-BAD_IMG_RE = re.compile(r'(ichef\.bbci\.co\.uk/news/\d+/|i\.guim\.co\.uk/.*?w=\d{1,3}[^0-9])', re.IGNORECASE)
-
-# Sources that block og:image scraping — skip the attempt entirely
-NO_SCRAPE_SOURCES = {"FT", "FT Opinion", "FT Alphaville", "The Economist",
-                     "The Economist Leaders", "MarketWatch"}
-
-OG_RE = re.compile(r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)', re.IGNORECASE)
-OG_RE2 = re.compile(r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\'][^>]*>', re.IGNORECASE)
-
-
-def scrape_og_image(url):
-    """Fetch og:image from an article URL. Returns None on any failure."""
-    try:
-        req = urllib.request.Request(
-            url,
-            headers={"User-Agent": "Mozilla/5.0 (compatible; Aurora/1.0)"},
-        )
-        with urllib.request.urlopen(req, timeout=4) as resp:
-            # Only read first 12KB — og:image is always in <head>
-            chunk = resp.read(12288).decode("utf-8", errors="ignore")
-        m = OG_RE.search(chunk) or OG_RE2.search(chunk)
-        return m.group(1) if m else None
-    except Exception:
-        return None
+TAG_RE    = re.compile(r"<[^>]+>")
+IMG_RE    = re.compile(r'<img[^>]+src=["\']([^"\']+)', re.IGNORECASE)
+BAD_IMG   = re.compile(r'(ichef\.bbci\.co\.uk/news/\d+/|i\.guim\.co\.uk/.*?w=\d{1,3}[^0-9])', re.IGNORECASE)
+OG_RE     = re.compile(r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)', re.IGNORECASE)
+OG_RE2    = re.compile(r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image', re.IGNORECASE)
 
 
 def clean_text(raw):
     return " ".join(html.unescape(TAG_RE.sub(" ", raw or "")).split())
 
 
-def extract_image(entry, source_name=""):
-    # Skip images for sources that serve bad thumbnails
-    if source_name in LOW_RES_SOURCES:
+def extract_image(entry, source=""):
+    if source in LOW_RES_SOURCES:
         return None
-
     for key in ("media_thumbnail", "media_content"):
         media = entry.get(key)
-        if media and media[0].get("url"):
-            url = media[0]["url"]
-            if not BAD_IMG_RE.search(url):
-                return url
+        if media and media[0].get("url") and not BAD_IMG.search(media[0]["url"]):
+            return media[0]["url"]
     for link in entry.get("links", []):
-        if link.get("type", "").startswith("image"):
-            href = link.get("href", "")
-            if href and not BAD_IMG_RE.search(href):
-                return href
+        if link.get("type", "").startswith("image") and not BAD_IMG.search(link.get("href", "")):
+            return link["href"]
     blob = (entry["content"][0].get("value", "") if entry.get("content") else "") + entry.get("summary", "")
     m = IMG_RE.search(blob)
-    if m:
-        url = m.group(1)
-        if not BAD_IMG_RE.search(url):
-            return url
+    if m and not BAD_IMG.search(m.group(1)):
+        return m.group(1)
     return None
+
+
+def scrape_og(url):
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=4) as r:
+            chunk = r.read(12288).decode("utf-8", errors="ignore")
+        m = OG_RE.search(chunk) or OG_RE2.search(chunk)
+        return m.group(1) if m else None
+    except Exception:
+        return None
 
 
 def entry_time(entry):
@@ -292,12 +336,13 @@ def entry_time(entry):
     return None
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Fetch
+# ─────────────────────────────────────────────────────────────────────────────
 def _is_excluded(title, source):
-    keywords = EXCLUDE_KEYWORDS.get(source, [])
-    if not keywords:
-        return False
-    title_lower = title.lower()
-    return any(kw in title_lower for kw in keywords)
+    kws = EXCLUDE_KEYWORDS.get(source, [])
+    t   = title.lower()
+    return any(k in t for k in kws)
 
 
 def _fetch_one(args):
@@ -324,90 +369,67 @@ def _fetch_one(args):
     return out[:cap]
 
 
-def _scrape_one(article):
-    """Fill in missing image via og:image scrape. Mutates in place."""
-    if article["image"] is None and article["source"] not in NO_SCRAPE_SOURCES:
-        article["image"] = scrape_og_image(article["link"])
-    return article
+def _scrape_one(a):
+    if a["image"] is None and a["source"] not in NO_SCRAPE_SOURCES:
+        a["image"] = scrape_og(a["link"])
+    return a
 
 
 @st.cache_data(ttl=900, show_spinner=False)
 def fetch(targets):
-    # Step 1: fetch all feeds in parallel
     items = []
     with ThreadPoolExecutor(max_workers=8) as pool:
         for chunk in pool.map(_fetch_one, list(targets)):
             items.extend(chunk)
     items.sort(key=lambda a: a["time"] or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
-
-    # Step 2: scrape og:image for articles that have no image yet
-    # Run in parallel with a capped pool so it stays fast
-    needs_scrape = [a for a in items if a["image"] is None
-                    and a["source"] not in NO_SCRAPE_SOURCES]
-    if needs_scrape:
+    needs = [a for a in items if a["image"] is None and a["source"] not in NO_SCRAPE_SOURCES]
+    if needs:
         with ThreadPoolExecutor(max_workers=12) as pool:
-            list(pool.map(_scrape_one, needs_scrape))
-
+            list(pool.map(_scrape_one, needs))
     return items
 
 
 def relative(dt):
     if not dt:
         return ""
-    diff = (datetime.now(timezone.utc) - dt).total_seconds()
-    if diff < 60:        return "now"
-    if diff < 3600:      return f"{int(diff // 60)}m"
-    if diff < 86400:     return f"{int(diff // 3600)}h"
-    if diff < 7 * 86400: return f"{int(diff // 86400)}d"
+    d = (datetime.now(timezone.utc) - dt).total_seconds()
+    if d < 60:        return "now"
+    if d < 3600:      return f"{int(d//60)}m"
+    if d < 86400:     return f"{int(d//3600)}h"
+    if d < 7*86400:   return f"{int(d//86400)}d"
     return dt.strftime("%d %b")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Diversity: pick SECTION_SIZE articles from a section, max 2 per source
-# ─────────────────────────────────────────────────────────────────────────────
-def diverse_section(articles, n=SECTION_SIZE, max_per_source=MAX_PER_SOURCE_IN_SECTION):
-    """
-    Pick n articles with source diversity: max max_per_source per source.
-    If diversity rules leave us short of n, top up with remaining articles
-    regardless of source so the section always has n items.
-    """
-    counts = {}
-    picked = []
-    leftover = []
+def diverse_section(articles, n=SECTION_SIZE, max_per=MAX_PER_SOURCE):
+    counts, picked, leftover = {}, [], []
     for a in articles:
         src = a["source"]
-        if counts.get(src, 0) < max_per_source:
+        if counts.get(src, 0) < max_per:
             counts[src] = counts.get(src, 0) + 1
             picked.append(a)
             if len(picked) == n:
                 return picked
         else:
             leftover.append(a)
-    # Top up with leftovers if we still need more
-    seen_ids = {id(a) for a in picked}
+    seen = {id(a) for a in picked}
     for a in leftover:
         if len(picked) >= n:
             break
-        if id(a) not in seen_ids:
+        if id(a) not in seen:
             picked.append(a)
     return picked
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Page config + CSS
+# Page config
 # ─────────────────────────────────────────────────────────────────────────────
-st.set_page_config(
-    page_title="Aurora",
-    page_icon="✦",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
+st.set_page_config(page_title="Aurora", page_icon="✦", layout="wide",
+                   initial_sidebar_state="expanded")
 
 CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;500;600;700&display=swap');
 
-/* ── Tokens ── */
 :root {
   --bg:      #0c0f1a;
   --surface: rgba(255,255,255,.05);
@@ -425,88 +447,55 @@ CSS = """
 }
 @media (prefers-color-scheme: light) {
   :root {
-    --bg:      #f4f4f0;
-    --surface: rgba(0,0,0,.04);
-    --card:    #ffffff;
-    --ink:     #111118;
-    --ink-2:   #5a5a6c;
-    --ink-3:   #98989e;
-    --rule:    #e0e0e8;
-    --shadow:  0 4px 16px rgba(0,0,0,.08);
-    --gold:    #9a7000;
+    --bg:#f4f4f0; --surface:rgba(0,0,0,.04); --card:#fff;
+    --ink:#111118; --ink-2:#5a5a6c; --ink-3:#98989e;
+    --rule:#e0e0e8; --shadow:0 4px 16px rgba(0,0,0,.08); --gold:#9a7000;
   }
 }
 
-/* ── Base ── */
-html, body, .stApp { background: var(--bg); font-family: var(--sans); color: var(--ink); }
-header[data-testid="stHeader"]  { background: transparent; }
-#MainMenu, footer               { display: none; }
-[data-testid="stAppViewContainer"],
-[data-testid="stMain"],
-[data-testid="stMainBlockContainer"] { background: transparent !important; }
-[data-testid="stMainBlockContainer"] { padding-top: 1.6rem; max-width: 1100px; }
+html,body,.stApp { background:var(--bg); font-family:var(--sans); color:var(--ink); }
+header[data-testid="stHeader"] { background:transparent; }
+#MainMenu,footer { display:none; }
+[data-testid="stAppViewContainer"],[data-testid="stMain"],
+[data-testid="stMainBlockContainer"] { background:transparent !important; }
+[data-testid="stMainBlockContainer"] { padding-top:1.4rem; max-width:1100px; }
 
-/* ── Ambient glow (dark only) ── */
+/* Ambient glow */
 .stApp::before {
   content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
   background:
-    radial-gradient(ellipse 55vw 48vh at 8%  2%,  rgba(75,95,255,.16), transparent 66%),
+    radial-gradient(ellipse 55vw 48vh at 8% 2%,   rgba(75,95,255,.16),  transparent 66%),
     radial-gradient(ellipse 48vw 44vh at 94% 6%,  rgba(195,75,155,.13), transparent 66%),
     radial-gradient(ellipse 50vw 46vh at 82% 97%, rgba(35,185,175,.11), transparent 66%);
-  animation: glow 26s ease-in-out infinite alternate;
+  animation:glow 26s ease-in-out infinite alternate;
 }
-@media (prefers-color-scheme: light) { .stApp::before { display:none; } }
+@media (prefers-color-scheme:light) { .stApp::before { display:none; } }
 @keyframes glow {
   from { opacity:.7; transform:scale(1); }
   to   { opacity:1;  transform:scale(1.03) translate(-1%,1%); }
 }
 @media (prefers-reduced-motion:reduce) {
-  .stApp::before, .feature .bg { animation:none !important; transition:none !important; }
+  .stApp::before,.feature .bg { animation:none !important; transition:none !important; }
 }
 
-/* ── Sidebar ── */
+/* Sidebar */
 [data-testid="stSidebar"] {
-  background: var(--surface) !important;
-  border-right: 1px solid var(--rule);
-  backdrop-filter: blur(22px);
+  background:var(--surface) !important;
+  border-right:1px solid var(--rule);
+  backdrop-filter:blur(22px);
 }
-[data-testid="stSidebar"] * { color: var(--ink); }
-
-.brand {
-  display:flex; align-items:center; gap:.5rem; padding:.2rem 0 .55rem;
-}
+[data-testid="stSidebar"] * { color:var(--ink); }
+.brand { display:flex; align-items:center; gap:.5rem; padding:.2rem 0 .55rem; }
 .brand .mark {
   width:28px; height:28px; border-radius:8px; display:grid; place-items:center;
   font-size:13px; color:#fff;
-  background: linear-gradient(135deg, #5b6fff, #c44eba 55%, #38d4be);
-  box-shadow: 0 3px 12px rgba(91,111,255,.5), inset 0 1px 0 rgba(255,255,255,.4);
+  background:linear-gradient(135deg,#5b6fff,#c44eba 55%,#38d4be);
+  box-shadow:0 3px 12px rgba(91,111,255,.5),inset 0 1px 0 rgba(255,255,255,.4);
 }
-.brand .name {
-  font-family:var(--serif); font-weight:700; font-size:1.22rem; letter-spacing:-.01em;
-}
-.sidebar-cap {
-  font-size:.67rem; letter-spacing:.10em; text-transform:uppercase;
-  color:var(--ink-3); font-weight:700; margin:.9rem 0 -.1rem;
-}
+.brand .name { font-family:var(--serif); font-weight:700; font-size:1.22rem; letter-spacing:-.01em; }
+.sidebar-cap { font-size:.67rem; letter-spacing:.10em; text-transform:uppercase; color:var(--ink-3); font-weight:700; margin:.9rem 0 -.1rem; }
 
-/* Layout toggle buttons at sidebar bottom */
-.layout-toggle {
-  display:flex; gap:8px; padding: .6rem 0 .2rem;
-}
-.layout-toggle button {
-  flex:1; border-radius:10px; border:1px solid var(--rule);
-  background:var(--card); color:var(--ink);
-  font-size:.78rem; font-weight:600; padding:.45rem .5rem;
-  cursor:pointer; transition:background .13s, border-color .13s;
-}
-.layout-toggle button.active {
-  background: rgba(91,111,255,.22);
-  border-color: rgba(91,111,255,.55);
-  color: var(--ink);
-}
-.layout-toggle button:hover:not(.active) { background:var(--surface); }
-
-/* ── Widgets ── */
+/* Widgets */
 .stButton button {
   border-radius:8px; border:1px solid var(--rule);
   background:var(--card); color:var(--ink);
@@ -523,328 +512,240 @@ header[data-testid="stHeader"]  { background: transparent; }
   background:var(--card) !important; border-color:var(--rule) !important; border-radius:9px !important;
 }
 
-/* ── Masthead ── */
+/* Masthead */
 .greet { display:flex; align-items:baseline; gap:.45rem; margin-bottom:.2rem; }
 .greet-pre  { font-family:var(--serif); font-style:italic; font-size:1.85rem; font-weight:400; color:var(--ink-2); }
 .greet-name { font-family:var(--serif); font-size:1.85rem; font-weight:700; color:var(--ink); letter-spacing:-.02em; }
-.masthead-meta {
-  font-size:.71rem; letter-spacing:.08em; text-transform:uppercase;
-  color:var(--ink-3); font-weight:600; margin-bottom:.65rem;
-}
-.masthead-rule { height:1px; margin-bottom:1rem; background:linear-gradient(90deg, var(--rule), transparent 100%); }
+.masthead-meta { font-size:.71rem; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-3); font-weight:600; margin-bottom:.65rem; }
+.masthead-rule { height:1px; margin-bottom:1rem; background:linear-gradient(90deg,var(--rule),transparent); }
 
-/* ── Source identity ── */
+/* Source icon */
 .ico {
-  width:17px; height:17px; border-radius:4px; flex:none;
-  display:inline-grid; place-items:center;
-  color:#fff; font-size:.5rem; font-weight:800;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.22);
+  display:inline-grid; place-items:center; flex:none;
+  color:#fff; font-size:.48rem; font-weight:800;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22);
 }
-.kicker {
-  display:flex; align-items:center; gap:.38rem;
-  font-size:.66rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
-  margin-bottom:.38rem;
-}
-.kicker .dot  { opacity:.4; }
-.kicker .ago  { opacity:.72; }
+.kicker { display:flex; align-items:center; gap:.38rem; font-size:.66rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; margin-bottom:.38rem; }
+.kicker .dot { opacity:.4; }
+.kicker .ago { opacity:.72; }
 .kicker .star { color:var(--gold); }
-.chip {
-  display:flex; align-items:center; gap:.36rem;
-  font-size:.72rem; color:var(--ink-2); font-weight:600; margin-top:.42rem;
-}
+.chip { display:flex; align-items:center; gap:.36rem; font-size:.72rem; color:var(--ink-2); font-weight:600; margin-top:.42rem; }
 .chip .ago  { color:var(--ink-3); font-weight:400; }
 .chip .star { color:var(--gold); margin-left:.14rem; }
 
-/* ── Section divider ── */
-.section-rule {
-  display:flex; align-items:center; gap:.65rem; margin:1.8rem 0 .85rem;
-}
-.section-rule .label {
-  font-size:.67rem; font-weight:800; letter-spacing:.12em;
-  text-transform:uppercase; color:var(--ink-3); white-space:nowrap;
-}
-.section-rule .line { flex:1; height:1px; background:var(--rule); }
+/* Section divider */
+.section-rule { display:flex; align-items:center; gap:.65rem; margin:1.8rem 0 .85rem; }
+.section-rule .label { font-size:.67rem; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-3); white-space:nowrap; }
+.section-rule .line  { flex:1; height:1px; background:var(--rule); }
 
-/* ── Feature (photo overlay) ── */
-.feature {
-  position:relative; display:block; border-radius:var(--r-lg);
-  overflow:hidden; text-decoration:none;
-  box-shadow:var(--shadow); isolation:isolate;
-}
+/* Feature tile (photo overlay) */
+.feature { position:relative; display:block; border-radius:var(--r-lg); overflow:hidden; text-decoration:none; box-shadow:var(--shadow); isolation:isolate; }
 .feature.cover { min-height:420px; }
 .feature.mid   { min-height:260px; }
 .feature.small { min-height:180px; }
 .feature.read  { opacity:.48; }
-
-.feature .bg {
-  position:absolute; inset:0; z-index:0;
-  background-size:cover; background-position:center;
-  transition:transform .7s cubic-bezier(.2,.7,.2,1);
-}
+.feature .bg   { position:absolute; inset:0; z-index:0; background-size:cover; background-position:center; transition:transform .7s cubic-bezier(.2,.7,.2,1); }
 .feature:hover .bg { transform:scale(1.04); }
-
-/* sheen sweep */
 .feature::after {
-  content:""; position:absolute; inset:0; z-index:3; pointer-events:none;
-  border-radius:inherit;
+  content:""; position:absolute; inset:0; z-index:3; pointer-events:none; border-radius:inherit;
   background:linear-gradient(115deg,transparent 38%,rgba(255,255,255,.12) 50%,transparent 62%);
   transform:translateX(-130%); transition:transform .9s ease;
 }
 .feature:hover::after { transform:translateX(130%); }
-
 .feature .plate {
-  position:absolute; left:14px; right:14px; bottom:14px; z-index:2;
-  padding:.8rem 1rem;
-  background:rgba(8,10,18,.40);
-  backdrop-filter:blur(18px) saturate(155%);
-  border:1px solid rgba(255,255,255,.17);
-  border-radius:13px;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.30), 0 6px 20px rgba(0,0,0,.26);
+  position:absolute; left:14px; right:14px; bottom:14px; z-index:2; padding:.8rem 1rem;
+  background:rgba(8,10,18,.40); backdrop-filter:blur(18px) saturate(155%);
+  border:1px solid rgba(255,255,255,.17); border-radius:13px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.30),0 6px 20px rgba(0,0,0,.26);
 }
 .feature.cover .plate { left:22px; right:22px; bottom:22px; padding:1rem 1.25rem; max-width:70%; }
+.feature .kicker { color:rgba(255,255,255,.88); }
+.feature .ft { font-family:var(--serif); font-weight:700; color:#fff; letter-spacing:-.018em; line-height:1.1; margin:0; display:-webkit-box; -webkit-box-orient:vertical; overflow:hidden; }
+.feature.cover .ft { font-size:2.2rem; -webkit-line-clamp:4; }
+.feature.mid .ft   { font-size:1.3rem; -webkit-line-clamp:3; }
+.feature.small .ft { font-size:1.05rem; -webkit-line-clamp:3; }
+.feature .fdek { color:rgba(255,255,255,.78); font-size:.9rem; line-height:1.5; margin:.45rem 0 0; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.feature.cover .fdek::first-letter { font-family:var(--serif); font-size:2.4em; float:left; line-height:.72; padding:.05em .11em 0 0; font-weight:700; color:#fff; }
 
-.feature .kicker  { color:rgba(255,255,255,.88); }
-.feature .ft {
-  font-family:var(--serif); font-weight:700; color:#fff;
-  letter-spacing:-.018em; line-height:1.1; margin:0;
-  display:-webkit-box; -webkit-box-orient:vertical; overflow:hidden;
-}
-.feature.cover .ft  { font-size:2.2rem; -webkit-line-clamp:4; }
-.feature.mid .ft    { font-size:1.3rem; -webkit-line-clamp:3; }
-.feature.small .ft  { font-size:1.05rem; -webkit-line-clamp:3; }
-
-.feature .fdek {
-  color:rgba(255,255,255,.78); font-size:.9rem; line-height:1.5; margin:.45rem 0 0;
-  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
-}
-.feature.cover .fdek::first-letter {
-  font-family:var(--serif); font-size:2.4em; float:left;
-  line-height:.72; padding:.05em .11em 0 0; font-weight:700; color:#fff;
-}
-
-/* ── Panel (colour-plate, no photo) ── */
-.panel {
-  position:relative; display:block; overflow:hidden;
-  text-decoration:none; color:var(--ink);
-  border-radius:var(--r-lg);
-  padding:1rem 1.2rem;
-  border:1px solid var(--rule);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.07), var(--shadow);
-  background:
-    linear-gradient(148deg, color-mix(in srgb, var(--c) 14%, transparent), transparent 58%),
-    var(--card);
-}
+/* Panel (no photo) */
+.panel { position:relative; display:block; overflow:hidden; text-decoration:none; color:var(--ink); border-radius:var(--r-lg); padding:1rem 1.2rem; border:1px solid var(--rule); box-shadow:inset 0 1px 0 rgba(255,255,255,.07),var(--shadow); background:linear-gradient(148deg,color-mix(in srgb,var(--c) 14%,transparent),transparent 58%),var(--card); }
 .panel.cover { min-height:420px; }
 .panel.mid   { min-height:260px; }
 .panel.small { min-height:180px; }
 .panel.read  { opacity:.48; }
-.panel::after {
-  content:""; position:absolute; inset:0; pointer-events:none; border-radius:inherit;
-  background:linear-gradient(115deg,transparent 38%,
-    color-mix(in srgb, var(--c) 16%, transparent) 50%,transparent 62%);
-  transform:translateX(-130%); transition:transform .9s ease;
-}
+.panel::after { content:""; position:absolute; inset:0; pointer-events:none; border-radius:inherit; background:linear-gradient(115deg,transparent 38%,color-mix(in srgb,var(--c) 16%,transparent) 50%,transparent 62%); transform:translateX(-130%); transition:transform .9s ease; }
 .panel:hover::after { transform:translateX(130%); }
 .panel .kicker { color:var(--c); }
-.panel .pt {
-  font-family:var(--serif); font-weight:700;
-  letter-spacing:-.015em; line-height:1.13; margin:0; color:var(--ink);
-  display:-webkit-box; -webkit-box-orient:vertical; overflow:hidden;
-}
-.panel.cover .pt  { font-size:2rem;   -webkit-line-clamp:5; }
-.panel.mid .pt    { font-size:1.35rem;-webkit-line-clamp:4; }
-.panel.small .pt  { font-size:1.05rem;-webkit-line-clamp:4; }
-.panel .pdek {
-  color:var(--ink-2); font-size:.9rem; line-height:1.5; margin:.45rem 0 0;
-  display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;
-}
+.panel .pt { font-family:var(--serif); font-weight:700; letter-spacing:-.015em; line-height:1.13; margin:0; color:var(--ink); display:-webkit-box; -webkit-box-orient:vertical; overflow:hidden; }
+.panel.cover .pt  { font-size:2rem;    -webkit-line-clamp:5; }
+.panel.mid .pt    { font-size:1.35rem; -webkit-line-clamp:4; }
+.panel.small .pt  { font-size:1.05rem; -webkit-line-clamp:4; }
+.panel .pdek { color:var(--ink-2); font-size:.9rem; line-height:1.5; margin:.45rem 0 0; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
 
-/* ── Standard card (small, bordered) ── */
+/* Small card */
 [data-testid="stVerticalBlockBorderWrapper"]:has(> div .cardlink) {
-  background:var(--card) !important;
-  border:1px solid var(--rule) !important;
+  background:var(--card) !important; border:1px solid var(--rule) !important;
   border-radius:var(--r) !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.06), var(--shadow);
-  transition:transform .15s ease, box-shadow .15s ease;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06),var(--shadow);
+  transition:transform .15s ease,box-shadow .15s ease;
 }
-[data-testid="stVerticalBlockBorderWrapper"]:has(> div .cardlink):hover {
-  transform:translateY(-2px);
-  box-shadow: 0 14px 32px rgba(0,0,0,.18);
-}
+[data-testid="stVerticalBlockBorderWrapper"]:has(> div .cardlink):hover { transform:translateY(-2px); box-shadow:0 14px 32px rgba(0,0,0,.18); }
 .cardlink { display:block; text-decoration:none; color:inherit; }
 .cardlink.read { opacity:.44; }
 
-/* img-wrap: stacks placeholder and real image, shows placeholder if img errors */
-.img-wrap {
-  position:relative; width:100%; aspect-ratio:16/10;
-  border-radius:9px; overflow:hidden;
-}
-.img-wrap .ph {
-  position:absolute; inset:0;
-  display:grid; place-items:center;
-  color:#fff; font-weight:800; font-size:1.25rem;
-}
-.img-wrap .over {
-  position:absolute; inset:0;
-  width:100%; height:100%; object-fit:cover;
-  border-radius:9px;
-}
+/* Image wrapper — stacks placeholder + real image */
+.img-wrap { position:relative; width:100%; aspect-ratio:16/10; border-radius:9px; overflow:hidden; }
+.img-wrap .ph  { position:absolute; inset:0; display:grid; place-items:center; color:#fff; font-weight:800; font-size:1.25rem; }
+.img-wrap .over { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; border-radius:9px; }
 .img-wrap .over.broken { display:none; }
 
-/* thumb variant for mobile lead cards */
-.thumb-wrap {
-  position:relative; width:78px; height:64px;
-  border-radius:8px; overflow:hidden; flex:none;
-}
-.thumb-wrap .ph {
-  position:absolute; inset:0;
-  display:grid; place-items:center;
-  color:#fff; font-weight:800; font-size:1.1rem;
-}
-.thumb-wrap .over {
-  position:absolute; inset:0;
-  width:100%; height:100%; object-fit:cover;
-}
+.thumb-wrap { position:relative; width:72px; height:72px; border-radius:10px; overflow:hidden; flex:none; }
+.thumb-wrap .ph   { position:absolute; inset:0; display:grid; place-items:center; color:#fff; font-weight:800; font-size:1rem; }
+.thumb-wrap .over { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
 .thumb-wrap .over.broken { display:none; }
 
 .cardlink .accent { height:3px; width:32px; border-radius:3px; margin:.1rem 0 .42rem; }
-.ctitle {
-  font-family:var(--serif); font-weight:700; font-size:.97rem;
-  line-height:1.3; letter-spacing:-.01em; color:var(--ink); margin:.52rem 0 0;
-  display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;
+.ctitle { font-family:var(--serif); font-weight:700; font-size:.97rem; line-height:1.3; letter-spacing:-.01em; color:var(--ink); margin:.52rem 0 0; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+
+/* ── Mobile app layout ─────────────────────────────────────────── */
+
+/* Section header for mobile */
+.m-section-head {
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  padding: .6rem 0 .5rem;
+  margin-top: .4rem;
+}
+.m-section-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex: none;
+}
+.m-section-label {
+  font-size: .72rem; font-weight: 800; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--ink-2);
 }
 
-/* ── Mobile strip (horizontal scroll per section) ── */
+/* Horizontal scroll strip */
 .strip-wrap {
-  overflow-x: auto;
-  overflow-y: visible;
+  overflow-x: auto; overflow-y: visible;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
-  margin: 0 -1rem;
-  padding: 0 1rem .5rem;
+  margin: 0 -1rem .2rem;
+  padding: 0 1rem .75rem;
 }
 .strip-wrap::-webkit-scrollbar { display: none; }
+.strip { display:flex; gap:.65rem; width:max-content; }
 
-.strip {
-  display: flex;
-  gap: .75rem;
-  width: max-content;
-  padding-bottom: .25rem;
-}
-
-/* Strip card — tall portrait tile */
+/* Individual strip card */
 .scard {
-  display: flex;
-  flex-direction: column;
-  width: 200px;
-  flex-shrink: 0;
-  border-radius: var(--r);
-  overflow: hidden;
-  text-decoration: none;
-  color: var(--ink);
+  width: 175px; flex-shrink: 0;
+  border-radius: 16px; overflow: hidden;
+  text-decoration: none; color: var(--ink);
   background: var(--card);
   border: 1px solid var(--rule);
-  box-shadow: var(--shadow);
+  box-shadow: 0 4px 16px rgba(0,0,0,.22);
+  display: flex; flex-direction: column;
   transition: transform .18s ease;
 }
-.scard:hover { transform: translateY(-3px); }
-.scard.read  { opacity: .45; }
+.scard:active { transform: scale(.97); }
 
-/* Image area — 16:10 top */
-.scard .simg {
-  position: relative;
-  width: 200px;
-  height: 125px;
-  flex-shrink: 0;
-  overflow: hidden;
+/* Photo area */
+.scard .sphoto {
+  position: relative; width: 175px; height: 110px; flex-shrink: 0; overflow: hidden;
 }
-.scard .simg .ph {
+.scard .sphoto .ph {
   position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 1.6rem; color: rgba(255,255,255,.9);
+  letter-spacing: -.02em;
+}
+/* Subtle pattern overlay on colour plates */
+.scard .sphoto .ph::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: repeating-linear-gradient(
+    -45deg, rgba(255,255,255,.04) 0px, rgba(255,255,255,.04) 1px,
+    transparent 1px, transparent 8px
+  );
+}
+.scard .sphoto .over {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+}
+.scard .sphoto .over.broken { display: none; }
+
+/* Gradient scrim at bottom of photo */
+.scard .sphoto .scrim {
+  position: absolute; bottom: 0; left: 0; right: 0; height: 48px;
+  background: linear-gradient(transparent, rgba(0,0,0,.45));
+  z-index: 1;
+}
+
+/* Source pill overlaid on photo */
+.scard .spill {
+  position: absolute; bottom: 6px; left: 8px; z-index: 2;
+  display: flex; align-items: center; gap: 4px;
+  background: rgba(0,0,0,.52);
+  backdrop-filter: blur(8px);
+  border-radius: 20px; padding: 2px 7px 2px 4px;
+}
+.scard .spill .sico {
+  width: 14px; height: 14px; border-radius: 3px; flex: none;
   display: grid; place-items: center;
-  color: #fff; font-weight: 800; font-size: 1.4rem;
+  color: #fff; font-size: .4rem; font-weight: 800;
 }
-.scard .simg .over {
-  position: absolute; inset: 0;
-  width: 100%; height: 100%; object-fit: cover;
+.scard .spill .sname {
+  font-size: .6rem; font-weight: 700; color: rgba(255,255,255,.9);
+  letter-spacing: .02em; white-space: nowrap;
+  max-width: 90px; overflow: hidden; text-overflow: ellipsis;
 }
-.scard .simg .over.broken { display: none; }
 
 /* Text body */
 .scard .sbody {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  padding: .65rem .75rem .6rem;
+  flex: 1; padding: .6rem .7rem .55rem;
+  display: flex; flex-direction: column; gap: .3rem;
 }
-.scard .skicker {
-  display: flex; align-items: center; gap: .32rem;
-  font-size: .6rem; font-weight: 800; letter-spacing: .06em;
-  text-transform: uppercase; color: var(--ink-3);
-  margin-bottom: .3rem;
+.scard .stime {
+  font-size: .6rem; color: var(--ink-3); font-weight: 500;
 }
-.scard .skicker .sico {
-  width: 13px; height: 13px; border-radius: 3px;
-  display: inline-grid; place-items: center;
-  color: #fff; font-size: .42rem; font-weight: 800; flex: none;
-}
-.scard .skicker .sago { color: var(--ink-3); }
 .scard .st {
   font-family: var(--serif); font-weight: 700;
-  font-size: .88rem; line-height: 1.28;
-  color: var(--ink); flex: 1;
+  font-size: .86rem; line-height: 1.3; color: var(--ink);
   display: -webkit-box; -webkit-line-clamp: 4;
   -webkit-box-orient: vertical; overflow: hidden;
+  flex: 1;
 }
-.scard .ssave {
-  align-self: flex-end;
-  margin-top: .5rem;
-  font-size: .65rem; font-weight: 600;
-  color: var(--ink-3); background: none;
-  border: none; cursor: pointer; padding: 0;
-}
-.scard .ssave.saved { color: var(--gold); }
 
-/* ── Save button ── */
+/* Save button */
 [data-testid="stMain"] .stButton { display:flex; justify-content:flex-end; margin-top:.32rem; }
-[data-testid="stMain"] .stButton > button {
-  width:auto; min-height:0; font-size:.71rem; font-weight:600;
-  padding:.2rem .58rem; border-radius:999px;
-}
+[data-testid="stMain"] .stButton > button { width:auto; min-height:0; font-size:.71rem; font-weight:600; padding:.2rem .58rem; border-radius:999px; }
 
-/* ── Empty / more ── */
+/* Empty / more */
 .empty { text-align:center; color:var(--ink-2); padding:4rem 1rem; }
 .empty .big { font-family:var(--serif); font-size:1.35rem; color:var(--ink); font-weight:700; margin-bottom:.4rem; }
 .more { text-align:center; color:var(--ink-3); font-size:.77rem; padding:1.5rem 0 .5rem; }
 
-/* ── Column height balance ── */
+/* Column height balance */
 [data-testid="stColumn"] { display:flex; }
 [data-testid="stColumn"] > [data-testid="stVerticalBlockBorderWrapper"] { width:100%; height:100%; }
 [data-testid="stColumn"] > [data-testid="stVerticalBlockBorderWrapper"] > div,
 [data-testid="stColumn"] > div[data-testid="stVerticalBlock"] { height:100%; display:flex; flex-direction:column; }
-[data-testid="stColumn"] [data-testid="stVerticalBlockBorderWrapper"]
-  [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:last-child,
-[data-testid="stColumn"] > div[data-testid="stVerticalBlock"]
-  > [data-testid="stElementContainer"]:last-child { margin-top:auto; }
+[data-testid="stColumn"] [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:last-child,
+[data-testid="stColumn"] > div[data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:last-child { margin-top:auto; }
 </style>
 """
 st.html(CSS)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Load config + state
+# State
 # ─────────────────────────────────────────────────────────────────────────────
-feeds, calm   = load_feeds()
-starred_set   = load_state()
-all_sources   = [s for items in feeds.values() for s, _ in items]
+feeds, calm = load_feeds()
+starred_set = load_state()
+all_sources = [s for items in feeds.values() for s, _ in items]
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Layout mode (mobile / desktop) — stored in session state
-# ─────────────────────────────────────────────────────────────────────────────
 if "layout" not in st.session_state:
     st.session_state.layout = "desktop"
 
-def set_layout(mode):
-    st.session_state.layout = mode
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Sidebar
@@ -855,80 +756,89 @@ with st.sidebar:
     st.html('<div class="sidebar-cap">Library</div>')
     view = st.radio("Library", SMART + list(feeds.keys()), label_visibility="collapsed")
 
-    if view == CALM_VIEW:
-        view_sources = [s for s in calm if s in all_sources]
-    elif view in (TODAY, ALL):
-        view_sources = all_sources
-    else:
-        view_sources = [s for s, _ in feeds.get(view, [])]
+    view_sources = (
+        [s for s in calm if s in all_sources] if view == CALM_VIEW
+        else all_sources if view in (TODAY, ALL)
+        else [s for s, _ in feeds.get(view, [])]
+    )
 
     st.html('<div class="sidebar-cap">Source</div>')
     source = st.selectbox("Source", [ALL_SOURCES, *view_sources], label_visibility="collapsed")
 
+    # ── Feed manager ──
     with st.expander("⚙︎  Manage feeds"):
-        st.caption("Add a feed")
-        nf_name = st.text_input("Name",    key="nf_name", placeholder="e.g. Wired")
-        nf_url  = st.text_input("RSS URL", key="nf_url",  placeholder="https://…/feed")
-        fold_opts  = list(feeds.keys()) + ["➕ New folder…"]
-        nf_fold    = st.selectbox("Folder", fold_opts, key="nf_fold")
-        nf_newfold = st.text_input("New folder name", key="nf_newfold") if nf_fold == "➕ New folder…" else ""
-        if st.button("Add feed", key="add_feed", use_container_width=True):
-            folder = (nf_newfold or "").strip() if nf_fold == "➕ New folder…" else nf_fold
-            if nf_name.strip() and nf_url.strip() and folder:
-                feeds.setdefault(folder, [])
-                if not any(u == nf_url.strip() for _, u in feeds[folder]):
-                    feeds[folder].append((nf_name.strip(), nf_url.strip()))
-                    save_feeds(feeds, calm); fetch.clear(); st.rerun()
+        tab_add, tab_remove, tab_calm = st.tabs(["Add", "Remove", "Calm"])
+
+        with tab_add:
+            nf_name = st.text_input("Name", placeholder="e.g. Tortoise", key="nf_name")
+            nf_url  = st.text_input("RSS URL", placeholder="https://…/feed", key="nf_url")
+            fold_opts  = list(feeds.keys()) + ["➕ New section…"]
+            nf_fold    = st.selectbox("Section", fold_opts, key="nf_fold")
+            nf_newfold = st.text_input("New section name", key="nf_newfold") if nf_fold == "➕ New section…" else ""
+            if st.button("Add feed", use_container_width=True, key="add_feed"):
+                folder = (nf_newfold or "").strip() if nf_fold == "➕ New section…" else nf_fold
+                if nf_name.strip() and nf_url.strip() and folder:
+                    feeds.setdefault(folder, [])
+                    if not any(u == nf_url.strip() for _, u in feeds[folder]):
+                        feeds[folder].append((nf_name.strip(), nf_url.strip()))
+                        save_feeds(feeds, calm)
+                        fetch.clear()
+                        st.success(f"Added {nf_name.strip()}")
+                        st.rerun()
+                else:
+                    st.warning("Name, URL and section are required.")
+
+        with tab_remove:
+            labels = [f"{fold} · {nm}" for fold, items in feeds.items() for nm, _ in items]
+            if labels:
+                rm = st.selectbox("Feed to remove", labels, label_visibility="collapsed", key="rm_pick")
+                if st.button("Remove", use_container_width=True, key="rm_feed", type="primary"):
+                    rfold, rname = [x.strip() for x in rm.split("·", 1)]
+                    feeds[rfold] = [(n, u) for n, u in feeds[rfold] if n != rname]
+                    if not feeds[rfold]:
+                        del feeds[rfold]
+                    calm = [c for c in calm if c in [n for it in feeds.values() for n, _ in it]]
+                    save_feeds(feeds, calm)
+                    fetch.clear()
+                    st.rerun()
             else:
-                st.warning("Name, URL and folder are required.")
+                st.caption("No feeds yet.")
 
-        st.divider()
-        st.caption("Remove a feed")
-        labels = [f"{fold}  —  {nm}" for fold, items in feeds.items() for nm, _ in items]
-        if labels:
-            rm = st.selectbox("Feed", labels, key="rm_pick", label_visibility="collapsed")
-            if st.button("Remove", key="rm_feed", use_container_width=True):
-                rfold, rname = [x.strip() for x in rm.split("—", 1)]
-                feeds[rfold] = [(n, u) for n, u in feeds[rfold] if n != rname]
-                if not feeds[rfold]:
-                    del feeds[rfold]
-                calm = [c for c in calm if c in [n for it in feeds.values() for n, _ in it]]
-                save_feeds(feeds, calm); fetch.clear(); st.rerun()
+        with tab_calm:
+            st.caption("Calm feeds appear only in the Calm view, not in Today or All.")
+            new_calm = st.multiselect(
+                "Calm sources", all_sources,
+                default=[c for c in calm if c in all_sources],
+                key="calm_pick", label_visibility="collapsed",
+            )
+            if set(new_calm) != set(calm):
+                calm = new_calm
+                save_feeds(feeds, calm)
+                st.rerun()
 
-        st.divider()
-        st.caption("Calm feeds (read-at-leisure)")
-        new_calm = st.multiselect(
-            "Calm sources", all_sources,
-            default=[c for c in calm if c in all_sources],
-            key="calm_pick", label_visibility="collapsed",
-        )
-        if set(new_calm) != set(calm):
-            save_feeds(feeds, new_calm); st.rerun()
-
-    if st.button("↻  Refresh", use_container_width=True):
+    if st.button("↻  Refresh feeds", use_container_width=True):
         fetch.clear(); st.rerun()
 
-    # ── Layout toggle — pinned at the bottom ──
+    # ── Layout toggle ──
     st.html('<div class="sidebar-cap">Layout</div>')
-    is_desktop = st.session_state.layout == "desktop"
+    is_desk = st.session_state.layout == "desktop"
     lc1, lc2 = st.columns(2, gap="small")
     with lc1:
         if st.button("🖥  Desktop", use_container_width=True,
-                     type="primary" if is_desktop else "secondary"):
-            set_layout("desktop"); st.rerun()
+                     type="primary" if is_desk else "secondary"):
+            st.session_state.layout = "desktop"; st.rerun()
     with lc2:
         if st.button("📱  Mobile", use_container_width=True,
-                     type="primary" if not is_desktop else "secondary"):
-            set_layout("mobile"); st.rerun()
+                     type="primary" if not is_desk else "secondary"):
+            st.session_state.layout = "mobile"; st.rerun()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Gather + filter articles
+# Fetch + filter
 # ─────────────────────────────────────────────────────────────────────────────
 calm_set = set(calm)
 if view == CALM_VIEW:
-    targets = tuple((n, u, folder) for folder, items in feeds.items()
-                    for n, u in items if n in calm_set)
+    targets = tuple((n, u, folder) for folder, items in feeds.items() for n, u in items if n in calm_set)
 elif view in (TODAY, ALL):
     targets = tuple((n, u, folder) for folder, items in feeds.items() for n, u in items)
 else:
@@ -938,11 +848,9 @@ with st.spinner("Fetching…"):
     articles = fetch(targets)
 
 if view == TODAY:
-    from datetime import timedelta
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    cutoff   = datetime.now(timezone.utc) - timedelta(hours=24)
     articles = [a for a in articles if a["time"] and a["time"] >= cutoff]
 
-# Deduplicate
 seen, deduped = set(), []
 for a in articles:
     a["id"] = aid(a["link"])
@@ -961,23 +869,17 @@ saved_n = sum(1 for a in articles if a["id"] in starred_set)
 # ─────────────────────────────────────────────────────────────────────────────
 _now = datetime.now()
 _h   = _now.hour
-if   5 <= _h < 12:  _pre = "Good morning,"
-elif 12 <= _h < 18: _pre = "Good afternoon,"
-elif 18 <= _h < 23: _pre = "Good evening,"
-else:               _pre = "Still up,"
-
+_pre = ("Good morning," if 5 <= _h < 12 else "Good afternoon," if 12 <= _h < 18
+        else "Good evening," if 18 <= _h < 23 else "Still up,")
 title_txt = source if source != ALL_SOURCES else view
-dateline  = _now.strftime("%A %-d %B %Y")
 
 st.html(
     f'<div class="greet">'
     f'<span class="greet-pre">{_pre}</span> '
-    f'<span class="greet-name">{html.escape(USER_NAME)}</span>'
-    f'</div>'
+    f'<span class="greet-name">{html.escape(USER_NAME)}</span></div>'
     f'<div class="masthead-meta">'
-    f'{html.escape(title_txt)} &nbsp;·&nbsp; {dateline}'
-    f' &nbsp;·&nbsp; {len(articles)} stories &nbsp;·&nbsp; {saved_n} saved'
-    f'</div>'
+    f'{html.escape(title_txt)} &nbsp;·&nbsp; {_now.strftime("%A %-d %B %Y")}'
+    f' &nbsp;·&nbsp; {len(articles)} stories &nbsp;·&nbsp; {saved_n} saved</div>'
     f'<div class="masthead-rule"></div>'
 )
 
@@ -986,8 +888,7 @@ with col_show:
     show = st.segmented_control("Show", ["All", "Saved"], default="All",
                                 label_visibility="collapsed") or "All"
 with col_search:
-    query = st.text_input("Search", placeholder="Search headlines…",
-                          label_visibility="collapsed")
+    query = st.text_input("Search", placeholder="Search headlines…", label_visibility="collapsed")
 
 if show == "Saved":
     articles = [a for a in articles if a["id"] in starred_set]
@@ -1003,8 +904,7 @@ def _kicker(a):
     star = ' <span class="star">★</span>' if a["id"] in starred_set else ""
     return (f'<div class="kicker">{icon_html(a["source"])}'
             f'<span>{html.escape(a["source"])}</span>'
-            f'<span class="dot">·</span>'
-            f'<span class="ago">{relative(a["time"])}</span>{star}</div>')
+            f'<span class="dot">·</span><span class="ago">{relative(a["time"])}</span>{star}</div>')
 
 
 def _chip(a):
@@ -1014,57 +914,41 @@ def _chip(a):
             f'<span class="ago">· {relative(a["time"])}</span>{star}</div>')
 
 
+def _img_wrap(img_url, color, inits, wrap="img-wrap"):
+    on_err = "this.classList.add('broken')"
+    img    = html.escape(img_url, quote=True)
+    return (f'<div class="{wrap}">'
+            f'<div class="ph" style="background:{color}">{inits}</div>'
+            f'<img class="over" src="{img}" loading="lazy" onerror="{on_err}">'
+            f'</div>')
+
+
 def feature_html(a, size="mid"):
-    img = (a["image"] or "").replace("'", "%27")
-    dek = ""
-    if size == "cover" and a["summary"]:
-        dek = f'<div class="fdek">{html.escape(a["summary"][:220])}</div>'
-    return (
-        f'<a class="feature {size}" href="{html.escape(a["link"], quote=True)}"'
-        f' target="_blank" rel="noopener noreferrer">'
-        f'<div class="bg" style="background-color:{color_for(a["source"])};'
-        f'background-image:url(\'{html.escape(img, quote=True)}\')"></div>'
-        f'<div class="plate">{_kicker(a)}'
-        f'<div class="ft">{html.escape(a["title"])}</div>{dek}</div></a>'
-    )
+    img  = (a["image"] or "").replace("'", "%27")
+    dek  = (f'<div class="fdek">{html.escape(a["summary"][:220])}</div>'
+            if size == "cover" and a["summary"] else "")
+    return (f'<a class="feature {size}" href="{html.escape(a["link"],quote=True)}"'
+            f' target="_blank" rel="noopener noreferrer">'
+            f'<div class="bg" style="background-color:{color_for(a["source"])};'
+            f'background-image:url(\'{html.escape(img,quote=True)}\')"></div>'
+            f'<div class="plate">{_kicker(a)}'
+            f'<div class="ft">{html.escape(a["title"])}</div>{dek}</div></a>')
 
 
 def panel_html(a, size="mid"):
     dek = f'<div class="pdek">{html.escape(a["summary"][:240])}</div>' if a["summary"] else ""
-    return (
-        f'<a class="panel {size}" href="{html.escape(a["link"], quote=True)}"'
-        f' target="_blank" rel="noopener noreferrer"'
-        f' style="--c:{color_for(a["source"])}">'
-        f'{_kicker(a)}'
-        f'<div class="pt">{html.escape(a["title"])}</div>{dek}</a>'
-    )
-
-
-def img_with_fallback(img_url, color, inits, css_class="media"):
-    """
-    Renders image with an always-in-DOM colour-plate fallback.
-    The real img sits on top (position:absolute); when it errors,
-    JS adds class 'broken' which hides it, revealing the plate below.
-    """
-    img      = html.escape(img_url, quote=True)
-    wrap_cls = "thumb-wrap" if css_class == "thumb" else "img-wrap"
-    on_err   = "this.classList.add('broken')"
-    return (
-        f'<div class="{wrap_cls}">'
-        f'<div class="ph" style="background:{color}">{inits}</div>'
-        f'<img class="over" src="{img}" loading="lazy" onerror="{on_err}">'
-        f'</div>'
-    )
+    return (f'<a class="panel {size}" href="{html.escape(a["link"],quote=True)}"'
+            f' target="_blank" rel="noopener noreferrer" style="--c:{color_for(a["source"])}">'
+            f'{_kicker(a)}<div class="pt">{html.escape(a["title"])}</div>{dek}</a>')
 
 
 def card_html(a):
     link  = html.escape(a["link"], quote=True)
     title = html.escape(a["title"])
-    src   = a["source"]
-    color = color_for(src)
-    inits = html.escape(initials(src))
+    color = color_for(a["source"])
+    inits = html.escape(initials(a["source"]))
     if a["image"]:
-        media = img_with_fallback(a["image"], color, inits, css_class="media")
+        media = _img_wrap(a["image"], color, inits)
         return (f'<a class="cardlink" href="{link}" target="_blank" rel="noopener noreferrer">'
                 f'{media}<div class="ctitle">{title}</div>{_chip(a)}</a>')
     accent = f'<div class="accent" style="background:{color}"></div>'
@@ -1072,29 +956,41 @@ def card_html(a):
             f'{accent}<div class="ctitle">{title}</div>{_chip(a)}</a>')
 
 
-def mobile_card_html(a, lead=False):
+def strip_card_html(a):
     link   = html.escape(a["link"], quote=True)
     title  = html.escape(a["title"])
     src    = a["source"]
     color  = color_for(src)
     inits  = html.escape(initials(src))
     src_e  = html.escape(src)
-    star   = "<span class='star'>&#9733;</span>" if a["id"] in starred_set else ""
-    kicker = (f'<div class="kicker" style="color:{color}">'
-              f'{icon_html(src)}'
-              f'<span>{src_e}</span>'
-              f'<span class="dot">&middot;</span>'
-              f'<span class="ago">{relative(a["time"])}</span>'
-              f'{star}</div>')
-    if lead and a["image"]:
-        thumb = img_with_fallback(a["image"], color, inits, css_class="thumb")
-        return (f'<a class="mcard-lead" href="{link}" target="_blank" rel="noopener noreferrer">'
-                f'{thumb}'
-                f'<div class="body">{kicker}'
-                f'<div class="mt">{title}</div></div></a>')
-    return (f'<a class="mcard" href="{link}" target="_blank" rel="noopener noreferrer">'
-            f'{kicker}<div class="mt">{title}</div></a>')
+    ago    = relative(a["time"])
+    on_err = "this.classList.add('broken')"
 
+    if a["image"]:
+        img_url = html.escape(a["image"], quote=True)
+        photo = (f'<div class="sphoto">'
+                 f'<div class="ph" style="background:{color}">{inits}</div>'
+                 f'<img class="over" src="{img_url}" loading="lazy" onerror="{on_err}">'
+                 f'<div class="scrim"></div>'
+                 f'<div class="spill">'
+                 f'<span class="sico" style="background:{color}">{inits}</span>'
+                 f'<span class="sname">{src_e}</span>'
+                 f'</div></div>')
+    else:
+        photo = (f'<div class="sphoto">'
+                 f'<div class="ph" style="background:{color}">{inits}</div>'
+                 f'<div class="scrim"></div>'
+                 f'<div class="spill">'
+                 f'<span class="sico" style="background:{color}">{inits}</span>'
+                 f'<span class="sname">{src_e}</span>'
+                 f'</div></div>')
+
+    return (f'<a class="scard" href="{link}" target="_blank" rel="noopener noreferrer">'
+            f'{photo}'
+            f'<div class="sbody">'
+            f'<div class="stime">{ago}</div>'
+            f'<div class="st">{title}</div>'
+            f'</div></a>')
 
 
 def actions(a):
@@ -1103,14 +999,21 @@ def actions(a):
               key=f"s_{a['id']}", on_click=toggle_star, args=(a["id"],))
 
 
-def section_header(label):
-    st.html(f'<div class="section-rule">'
-            f'<span class="label">{html.escape(label)}</span>'
-            f'<span class="line"></span></div>')
+def section_header(label, desktop=True):
+    if desktop:
+        st.html(f'<div class="section-rule"><span class="label">{html.escape(label)}</span>'
+                f'<span class="line"></span></div>')
+    else:
+        # Mobile: coloured dot + label
+        color = "#888"
+        st.html(f'<div class="m-section-head">'
+                f'<div class="m-section-dot" style="background:{color}"></div>'
+                f'<span class="m-section-label">{html.escape(label)}</span>'
+                f'</div>')
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Desktop layout helpers
+# Desktop layout
 # ─────────────────────────────────────────────────────────────────────────────
 def render_big(a, size="mid"):
     with st.container(border=False):
@@ -1125,29 +1028,16 @@ def render_small(a):
 
 
 def render_section_desktop(folder_items, is_first=False):
-    """
-    Layout for one section (folder) in desktop view.
-    5 diverse articles, variable card sizes:
-      - Article 0: full-width cover (large)
-      - Articles 1-2: side-by-side medium tiles
-      - Articles 3-4: row of 2 small cards
-    """
     items = diverse_section(folder_items)
     if not items:
         return
-
-    # Card 0 — cover
     render_big(items[0], size="cover" if is_first else "mid")
     st.write("")
-
-    # Cards 1-2 — medium pair (if we have them)
     if len(items) >= 3:
         c1, c2 = st.columns(2, gap="medium")
-        with c1: render_big(items[1], size="mid")
-        with c2: render_big(items[2], size="mid")
+        with c1: render_big(items[1], "mid")
+        with c2: render_big(items[2], "mid")
         st.write("")
-
-    # Cards 3-4 — small trio or pair
     tail = items[3:]
     if tail:
         cols = st.columns(len(tail), gap="medium")
@@ -1157,61 +1047,14 @@ def render_section_desktop(folder_items, is_first=False):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Mobile layout helpers — horizontal strip
+# Mobile layout — horizontal strip
 # ─────────────────────────────────────────────────────────────────────────────
-def strip_card_html(a):
-    """Single card inside the horizontal strip."""
-    link   = html.escape(a["link"], quote=True)
-    title  = html.escape(a["title"])
-    src    = a["source"]
-    color  = color_for(src)
-    inits  = html.escape(initials(src))
-    src_e  = html.escape(src)
-    ago    = relative(a["time"])
-    on_err = "this.classList.add('broken')"
-
-    # Image or colour plate
-    if a["image"]:
-        img_url = html.escape(a["image"], quote=True)
-        img_block = (
-            f'<div class="simg">'
-            f'<div class="ph" style="background:{color}">{inits}</div>'
-            f'<img class="over" src="{img_url}" loading="lazy" onerror="{on_err}">'
-            f'</div>'
-        )
-    else:
-        img_block = (
-            f'<div class="simg">'
-            f'<div class="ph" style="background:{color}">{inits}</div>'
-            f'</div>'
-        )
-
-    return (
-        f'<a class="scard" href="{link}" target="_blank" rel="noopener noreferrer">'
-        f'{img_block}'
-        f'<div class="sbody">'
-        f'<div class="skicker">'
-        f'<span class="sico" style="background:{color}">{inits}</span>'
-        f'<span>{src_e}</span>'
-        f'<span class="sago">&middot; {ago}</span>'
-        f'</div>'
-        f'<div class="st">{title}</div>'
-        f'</div></a>'
-    )
-
-
 def render_section_mobile(folder_items):
-    """Horizontal scrolling strip of cards per section."""
     items = diverse_section(folder_items)
     if not items:
         return
-
-    cards_html = "".join(strip_card_html(a) for a in items)
-    st.html(
-        f'<div class="strip-wrap">'
-        f'<div class="strip">{cards_html}</div>'
-        f'</div>'
-    )
+    cards = "".join(strip_card_html(a) for a in items)
+    st.html(f'<div class="strip-wrap"><div class="strip">{cards}</div></div>')
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1236,60 +1079,47 @@ else:
         for idx, (folder, folder_items) in enumerate(grouped.items()):
             if not folder_items:
                 continue
-            section_header(folder)
+            section_header(folder, desktop=not mobile_mode)
             if mobile_mode:
                 render_section_mobile(folder_items)
             else:
                 render_section_desktop(folder_items, is_first=(idx == 0))
 
     else:
-        # Single-folder / single-source: classic magazine rhythm on desktop,
-        # horizontal strip on mobile
+        # Single folder / source view
         if mobile_mode:
-            cards_html = "".join(strip_card_html(a) for a in items)
-            st.html(
-                '<div class="strip-wrap">'
-                f'<div class="strip">{cards_html}</div>'
-                '</div>'
-            )
+            cards = "".join(strip_card_html(a) for a in items)
+            st.html(f'<div class="strip-wrap"><div class="strip">{cards}</div></div>')
         else:
             cover = next((a for a in items if a["image"]), items[0])
             rest  = [a for a in items if a is not cover]
-
             render_big(cover, size="cover")
             st.write("")
-
             pattern = ["trio", "trio", "band", "trio", "pair", "trio"]
             i, p, n = 0, 0, len(rest)
             while i < n:
-                block = pattern[p % len(pattern)]
-                p += 1
-                left  = n - i
+                block = pattern[p % len(pattern)]; p += 1; left = n - i
                 if left <= 2:
-                    if left == 1:
-                        render_big(rest[i])
+                    if left == 1: render_big(rest[i])
                     else:
                         c1, c2 = st.columns(2, gap="medium")
                         with c1: render_small(rest[i])
-                        with c2: render_small(rest[i + 1])
-                    i += left
+                        with c2: render_small(rest[i+1])
                     break
                 if block == "band":
                     render_big(rest[i]); i += 1
                 elif block == "pair":
-                    chunk = rest[i:i + 2]; i += 2
+                    chunk = rest[i:i+2]; i += 2
                     c1, c2 = st.columns(2, gap="medium")
                     with c1: render_big(chunk[0])
                     with c2: render_big(chunk[1])
                 else:
-                    chunk = rest[i:i + 3]; i += 3
-                    cols  = st.columns(3, gap="medium")
+                    chunk = rest[i:i+3]; i += 3
+                    cols = st.columns(3, gap="medium")
                     for k, a in enumerate(chunk):
                         with cols[k]: render_small(a)
                 st.write("")
 
     if len(articles) > DISPLAY_LIMIT:
-        st.html(
-            f'<div class="more">Showing {DISPLAY_LIMIT} of {len(articles)} stories. '
-            f'Pick a folder or search to go deeper.</div>'
-        )
+        st.html(f'<div class="more">Showing {DISPLAY_LIMIT} of {len(articles)} stories. '
+                f'Pick a section or search to go deeper.</div>')
