@@ -68,9 +68,6 @@ EXCLUDE_KEYWORDS = {
         "review", "best", "buying guide", "how to", "deal", "deals",
         "discount", "sale", "gear", "tested", "gift guide", "coupon", "promo",
     ],
-    "Euractiv": [
-      "Hack", "firepower", "voltage", "first aid", "harvest",
-    ],
 }
 
 DEFAULT_FEEDS = {
@@ -626,113 +623,140 @@ header[data-testid="stHeader"] { background:transparent; }
 .cardlink .accent { height:3px; width:32px; border-radius:3px; margin:.1rem 0 .42rem; }
 .ctitle { font-family:var(--serif); font-weight:700; font-size:.97rem; line-height:1.3; letter-spacing:-.01em; color:var(--ink); margin:.52rem 0 0; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
 
-/* ── Mobile app layout ─────────────────────────────────────────── */
+/* ── Mobile layout — Google News style ──────────────────────────── */
 
-/* Section header for mobile */
+/* Section header */
 .m-section-head {
-  display: flex;
-  align-items: center;
-  gap: .55rem;
-  padding: .6rem 0 .5rem;
-  margin-top: .4rem;
-}
-.m-section-dot {
-  width: 8px; height: 8px; border-radius: 50%; flex: none;
+  display: flex; align-items: center; gap: .6rem;
+  padding: .9rem 0 .6rem; margin-top: .2rem;
+  border-top: 1px solid var(--rule);
 }
 .m-section-label {
-  font-size: .72rem; font-weight: 800; letter-spacing: .1em;
-  text-transform: uppercase; color: var(--ink-2);
+  font-family: var(--serif); font-size: 1.1rem; font-weight: 700;
+  color: var(--ink); letter-spacing: -.01em;
+}
+.m-section-count {
+  font-size: .68rem; color: var(--ink-3); font-weight: 500;
+  margin-left: auto;
 }
 
-/* Horizontal scroll strip */
-.strip-wrap {
-  overflow-x: auto; overflow-y: visible;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-  margin: 0 -1rem .2rem;
-  padding: 0 1rem .75rem;
-}
-.strip-wrap::-webkit-scrollbar { display: none; }
-.strip { display:flex; gap:.65rem; width:max-content; }
-
-/* Individual strip card */
-.scard {
-  width: 175px; flex-shrink: 0;
+/* Hero card — full width, tall photo */
+.m-hero {
+  display: block; text-decoration: none; color: var(--ink);
   border-radius: 16px; overflow: hidden;
-  text-decoration: none; color: var(--ink);
-  background: var(--card);
-  border: 1px solid var(--rule);
-  box-shadow: 0 4px 16px rgba(0,0,0,.22);
-  display: flex; flex-direction: column;
-  transition: transform .18s ease;
+  background: var(--card); border: 1px solid var(--rule);
+  box-shadow: 0 4px 20px rgba(0,0,0,.2);
+  margin-bottom: .65rem;
+  transition: transform .15s ease;
 }
-.scard:active { transform: scale(.97); }
-
-/* Photo area */
-.scard .sphoto {
-  position: relative; width: 175px; height: 110px; flex-shrink: 0; overflow: hidden;
+.m-hero:active { transform: scale(.985); }
+.m-hero .m-hero-img {
+  position: relative; width: 100%; height: 190px; overflow: hidden;
 }
-.scard .sphoto .ph {
+.m-hero .m-hero-img .ph {
   position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;
-  font-weight: 800; font-size: 1.6rem; color: rgba(255,255,255,.9);
-  letter-spacing: -.02em;
+  font-weight: 800; font-size: 2.2rem; color: rgba(255,255,255,.9);
 }
-/* Subtle pattern overlay on colour plates */
-.scard .sphoto .ph::after {
-  content: "";
-  position: absolute; inset: 0;
-  background: repeating-linear-gradient(
-    -45deg, rgba(255,255,255,.04) 0px, rgba(255,255,255,.04) 1px,
-    transparent 1px, transparent 8px
-  );
+.m-hero .m-hero-img .ph::after {
+  content: ""; position: absolute; inset: 0;
+  background: repeating-linear-gradient(-45deg,
+    rgba(255,255,255,.04) 0,rgba(255,255,255,.04) 1px,
+    transparent 1px,transparent 8px);
 }
-.scard .sphoto .over {
-  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+.m-hero .m-hero-img .over {
+  position: absolute; inset: 0; width:100%; height:100%; object-fit:cover;
 }
-.scard .sphoto .over.broken { display: none; }
-
-/* Gradient scrim at bottom of photo */
-.scard .sphoto .scrim {
-  position: absolute; bottom: 0; left: 0; right: 0; height: 48px;
-  background: linear-gradient(transparent, rgba(0,0,0,.45));
-  z-index: 1;
+.m-hero .m-hero-img .over.broken { display:none; }
+.m-hero .m-hero-img .scrim {
+  position: absolute; bottom:0; left:0; right:0; height:80px;
+  background: linear-gradient(transparent, rgba(0,0,0,.5)); z-index:1;
 }
-
-/* Source pill overlaid on photo */
-.scard .spill {
-  position: absolute; bottom: 6px; left: 8px; z-index: 2;
-  display: flex; align-items: center; gap: 4px;
-  background: rgba(0,0,0,.52);
-  backdrop-filter: blur(8px);
-  border-radius: 20px; padding: 2px 7px 2px 4px;
+.m-hero .m-hero-body {
+  padding: .75rem .9rem .8rem;
 }
-.scard .spill .sico {
-  width: 14px; height: 14px; border-radius: 3px; flex: none;
-  display: grid; place-items: center;
-  color: #fff; font-size: .4rem; font-weight: 800;
+.m-hero .m-source-row {
+  display: flex; align-items: center; gap: .35rem;
+  margin-bottom: .35rem;
 }
-.scard .spill .sname {
-  font-size: .6rem; font-weight: 700; color: rgba(255,255,255,.9);
-  letter-spacing: .02em; white-space: nowrap;
-  max-width: 90px; overflow: hidden; text-overflow: ellipsis;
-}
-
-/* Text body */
-.scard .sbody {
-  flex: 1; padding: .6rem .7rem .55rem;
-  display: flex; flex-direction: column; gap: .3rem;
-}
-.scard .stime {
-  font-size: .6rem; color: var(--ink-3); font-weight: 500;
-}
-.scard .st {
+.m-hero .m-source-name { font-size:.68rem; font-weight:700; color:var(--ink-3); }
+.m-hero .m-source-dot  { font-size:.68rem; color:var(--ink-3); opacity:.5; }
+.m-hero .m-source-ago  { font-size:.68rem; color:var(--ink-3); }
+.m-hero .m-hero-title {
   font-family: var(--serif); font-weight: 700;
-  font-size: .86rem; line-height: 1.3; color: var(--ink);
-  display: -webkit-box; -webkit-line-clamp: 4;
+  font-size: 1.1rem; line-height: 1.28; color: var(--ink);
+  display: -webkit-box; -webkit-line-clamp: 3;
   -webkit-box-orient: vertical; overflow: hidden;
-  flex: 1;
 }
+
+/* Pair row — two cards side by side */
+.m-pair {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: .55rem; margin-bottom: .65rem;
+}
+.m-pair-card {
+  display: flex; flex-direction: column;
+  text-decoration: none; color: var(--ink);
+  background: var(--card); border: 1px solid var(--rule);
+  border-radius: 13px; overflow: hidden;
+  box-shadow: 0 3px 12px rgba(0,0,0,.16);
+  transition: transform .15s ease;
+}
+.m-pair-card:active { transform: scale(.97); }
+.m-pair-card .m-pair-img {
+  position: relative; width: 100%; aspect-ratio: 16/10; overflow: hidden;
+}
+.m-pair-card .m-pair-img .ph {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 1.3rem; color: rgba(255,255,255,.9);
+}
+.m-pair-card .m-pair-img .over {
+  position: absolute; inset:0; width:100%; height:100%; object-fit:cover;
+}
+.m-pair-card .m-pair-img .over.broken { display:none; }
+.m-pair-card .m-pair-body { padding: .5rem .6rem .55rem; flex:1; display:flex; flex-direction:column; }
+.m-pair-card .m-pair-src  { font-size:.6rem; font-weight:700; color:var(--ink-3); margin-bottom:.25rem; }
+.m-pair-card .m-pair-title {
+  font-family: var(--serif); font-weight: 700;
+  font-size: .82rem; line-height: 1.28; color: var(--ink);
+  display: -webkit-box; -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical; overflow: hidden; flex:1;
+}
+
+/* Compact list row — thumbnail right, text left */
+.m-list-card {
+  display: flex; align-items: flex-start; gap: .65rem;
+  text-decoration: none; color: var(--ink);
+  background: var(--card); border: 1px solid var(--rule);
+  border-radius: 13px; padding: .65rem .75rem;
+  margin-bottom: .5rem;
+  box-shadow: 0 2px 10px rgba(0,0,0,.13);
+  transition: transform .15s ease;
+}
+.m-list-card:active { transform: scale(.988); }
+.m-list-card .m-list-body { flex:1; min-width:0; }
+.m-list-card .m-list-src  { font-size:.62rem; font-weight:700; color:var(--ink-3); margin-bottom:.22rem; }
+.m-list-card .m-list-title {
+  font-family: var(--serif); font-weight: 700;
+  font-size: .88rem; line-height: 1.28; color: var(--ink);
+  display: -webkit-box; -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical; overflow: hidden;
+}
+.m-list-card .m-list-ago { font-size:.6rem; color:var(--ink-3); margin-top:.22rem; }
+.m-list-thumb {
+  position: relative; width: 72px; height: 64px;
+  border-radius: 9px; overflow: hidden; flex-shrink:0;
+}
+.m-list-thumb .ph {
+  position:absolute; inset:0;
+  display:grid; place-items:center;
+  font-weight:800; font-size:.9rem; color:rgba(255,255,255,.9);
+}
+.m-list-thumb .over {
+  position:absolute; inset:0; width:100%; height:100%; object-fit:cover;
+}
+.m-list-thumb .over.broken { display:none; }
 
 /* Save button */
 [data-testid="stMain"] .stButton { display:flex; justify-content:flex-end; margin-top:.32rem; }
@@ -1016,41 +1040,77 @@ def card_html(a):
             f'{accent}<div class="ctitle">{title}</div>{_chip(a)}</a>')
 
 
-def strip_card_html(a):
-    link   = html.escape(a["link"], quote=True)
-    title  = html.escape(a["title"])
-    src    = a["source"]
-    color  = color_for(src)
-    inits  = html.escape(initials(src))
-    src_e  = html.escape(src)
-    ago    = relative(a["time"])
+# ─────────────────────────────────────────────────────────────────────────────
+# Mobile HTML builders
+# ─────────────────────────────────────────────────────────────────────────────
+def _m_img(img_url, color, inits, cls):
     on_err = "this.classList.add('broken')"
+    img    = html.escape(img_url, quote=True) if img_url else ""
+    ph     = f'<div class="ph" style="background:{color}">{inits}</div>'
+    over   = f'<img class="over" src="{img}" loading="lazy" onerror="{on_err}">' if img_url else ""
+    return f'<div class="{cls}">{ph}{over}</div>'
 
-    if a["image"]:
-        img_url = html.escape(a["image"], quote=True)
-        photo = (f'<div class="sphoto">'
-                 f'<div class="ph" style="background:{color}">{inits}</div>'
-                 f'<img class="over" src="{img_url}" loading="lazy" onerror="{on_err}">'
-                 f'<div class="scrim"></div>'
-                 f'<div class="spill">'
-                 f'<span class="sico" style="background:{color}">{inits}</span>'
-                 f'<span class="sname">{src_e}</span>'
-                 f'</div></div>')
-    else:
-        photo = (f'<div class="sphoto">'
-                 f'<div class="ph" style="background:{color}">{inits}</div>'
-                 f'<div class="scrim"></div>'
-                 f'<div class="spill">'
-                 f'<span class="sico" style="background:{color}">{inits}</span>'
-                 f'<span class="sname">{src_e}</span>'
-                 f'</div></div>')
 
-    return (f'<a class="scard" href="{link}" target="_blank" rel="noopener noreferrer">'
-            f'{photo}'
-            f'<div class="sbody">'
-            f'<div class="stime">{ago}</div>'
-            f'<div class="st">{title}</div>'
+def _m_src_row(src_e, color, ago):
+    return (f'<div class="m-source-row">'
+            f'<span class="m-source-name" style="color:{color}">{src_e}</span>'
+            f'<span class="m-source-dot">·</span>'
+            f'<span class="m-source-ago">{ago}</span>'
+            f'</div>')
+
+
+def m_hero_html(a):
+    """Full-width hero card — big photo, large title."""
+    link  = html.escape(a["link"], quote=True)
+    title = html.escape(a["title"])
+    src   = a["source"]; color = color_for(src)
+    inits = html.escape(initials(src)); src_e = html.escape(src)
+    ago   = relative(a["time"])
+    img   = _m_img(a["image"], color, inits, "m-hero-img")
+    scrim = '<div class="scrim"></div>'
+    img_w = img.replace("</div>", f"{scrim}</div>", 1)
+    body  = (f'<div class="m-hero-body">'
+             f'{_m_src_row(src_e, color, ago)}'
+             f'<div class="m-hero-title">{title}</div>'
+             f'</div>')
+    return f'<a class="m-hero" href="{link}" target="_blank" rel="noopener noreferrer">{img_w}{body}</a>'
+
+
+def m_pair_html(a):
+    """Half-width card for the pair row."""
+    link  = html.escape(a["link"], quote=True)
+    title = html.escape(a["title"])
+    src   = a["source"]; color = color_for(src)
+    inits = html.escape(initials(src)); src_e = html.escape(src)
+    img   = _m_img(a["image"], color, inits, "m-pair-img")
+    return (f'<a class="m-pair-card" href="{link}" target="_blank" rel="noopener noreferrer">'
+            f'{img}'
+            f'<div class="m-pair-body">'
+            f'<div class="m-pair-src" style="color:{color}">{src_e}</div>'
+            f'<div class="m-pair-title">{title}</div>'
             f'</div></a>')
+
+
+def m_list_html(a):
+    """Compact list row — text left, small thumb right."""
+    link  = html.escape(a["link"], quote=True)
+    title = html.escape(a["title"])
+    src   = a["source"]; color = color_for(src)
+    inits = html.escape(initials(src)); src_e = html.escape(src)
+    ago   = relative(a["time"])
+    thumb = _m_img(a["image"], color, inits, "m-list-thumb")
+    return (f'<a class="m-list-card" href="{link}" target="_blank" rel="noopener noreferrer">'
+            f'<div class="m-list-body">'
+            f'<div class="m-list-src" style="color:{color}">{src_e}</div>'
+            f'<div class="m-list-title">{title}</div>'
+            f'<div class="m-list-ago">{ago}</div>'
+            f'</div>'
+            f'{thumb}</a>')
+
+
+def strip_card_html(a):
+    """Kept for compatibility — routes to m_list_html."""
+    return m_list_html(a)
 
 
 def actions(a):
@@ -1070,7 +1130,13 @@ def section_header(label, desktop=True):
         with col_line:
             st.html('<div style="height:1px;background:var(--rule);margin-top:1.1rem"></div>')
     else:
-        if st.button(f"  {label}  →", key=f"nav_{label}", use_container_width=False):
+        count = len(folder_items) if "folder_items" in dir() else ""
+        st.html(
+            f'<div class="m-section-head">'
+            f'<span class="m-section-label">{html.escape(label)}</span>'
+            f'</div>'
+        )
+        if st.button(f"{label} →", key=f"nav_{label}"):
             st.session_state.nav_to = label
             st.rerun()
 
@@ -1110,14 +1176,32 @@ def render_section_desktop(folder_items, is_first=False):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Mobile layout — horizontal strip
+# Mobile layout — Google News style
 # ─────────────────────────────────────────────────────────────────────────────
 def render_section_mobile(folder_items):
+    """
+    Layout per section:
+      [0]      — hero: full-width, big photo, large title
+      [1] [2]  — pair: two half-width cards side by side
+      [3] [4]  — list: compact rows with thumbnail right
+    """
     items = diverse_section(folder_items)
     if not items:
         return
-    cards = "".join(strip_card_html(a) for a in items)
-    st.html(f'<div class="strip-wrap"><div class="strip">{cards}</div></div>')
+
+    # Hero
+    st.html(m_hero_html(items[0]))
+
+    # Pair
+    if len(items) >= 3:
+        pair = m_pair_html(items[1]) + m_pair_html(items[2])
+        st.html(f'<div class="m-pair">{pair}</div>')
+    elif len(items) == 2:
+        st.html(m_list_html(items[1]))
+
+    # List rows
+    for a in items[3:]:
+        st.html(m_list_html(a))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
