@@ -235,6 +235,12 @@ def save_feeds(feeds, calm):
 
 
 def load_state():
+    # Try Gist first
+    if _has_gist():
+        d = _gist_load()
+        if d and "starred" in d:
+            return set(d["starred"])
+    # Fall back to local file
     try:
         with open(STATE_PATH, "r", encoding="utf-8") as f:
             return set(json.load(f).get("starred", []))
@@ -243,6 +249,12 @@ def load_state():
 
 
 def save_state(starred):
+    # Save to Gist alongside feeds
+    if _has_gist():
+        d = _gist_load() or {}
+        d["starred"] = sorted(starred)
+        _gist_save(d)
+    # Always save locally too
     try:
         with open(STATE_PATH, "w", encoding="utf-8") as f:
             json.dump({"starred": sorted(starred)}, f)
@@ -385,7 +397,7 @@ def fetch(targets):
     needs = [a for a in items if a["image"] is None and a["source"] not in NO_SCRAPE_SOURCES]
     if needs:
         with ThreadPoolExecutor(max_workers=12) as pool:
-            list(pool.map(_scrape_one, needs))
+            list(pool.map(_scrape_one, needs[:15]))  # cap at 15 to keep load time reasonable
     return items
 
 
