@@ -735,7 +735,43 @@ header[data-testid="stHeader"] { background:transparent; }
 [data-testid="stColumn"] > div[data-testid="stVerticalBlock"] { height:100%; display:flex; flex-direction:column; }
 [data-testid="stColumn"] [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:last-child,
 [data-testid="stColumn"] > div[data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:last-child { margin-top:auto; }
+/* ── Scroll-to-top button (mobile) ── */
+#scroll-top {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 44px;
+  z-index: 9999;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  -webkit-tap-highlight-color: transparent;
+  display: none;
+}
+#scroll-top.visible { display: block; }
+/* Thin progress bar at very top as visual hint */
+#scroll-top::after {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #5b6fff, #c44eba);
+  opacity: 0;
+  transition: opacity .2s;
+}
+#scroll-top:active::after { opacity: 1; }
 </style>
+<script>
+(function(){
+  var btn = document.createElement("button");
+  btn.id = "scroll-top";
+  btn.setAttribute("aria-label", "Scroll to top");
+  btn.onclick = function(){ window.scrollTo({top:0,behavior:"smooth"}); };
+  document.body.appendChild(btn);
+  window.addEventListener("scroll", function(){
+    btn.classList.toggle("visible", window.scrollY > 200);
+  }, {passive:true});
+})();
+</script>
 """
 st.html(CSS)
 
