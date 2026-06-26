@@ -68,6 +68,9 @@ EXCLUDE_KEYWORDS = {
         "review", "best", "buying guide", "how to", "deal", "deals",
         "discount", "sale", "gear", "tested", "gift guide", "coupon", "promo",
     ],
+    "Euractiv": [
+      "The hack", "firepower", "voltage", "first aid", "harvest",
+    ],
 }
 
 DEFAULT_FEEDS = {
