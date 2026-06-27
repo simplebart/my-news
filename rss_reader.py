@@ -615,11 +615,11 @@ def mobile_nav(current_view):
         '<div class="mobile-nav-brand"><span class="mobile-nav-mark">✦</span>'
         '<span class="mobile-nav-title">Aurora</span></div>'
         '<nav class="mobile-nav-links" aria-label="Aurora navigation">'
-        f'<a class="mobile-nav-link{active["today"]}" href="?nav=today">Today</a>'
-        f'<a class="mobile-nav-link{active["all"]}" href="?nav=all">All</a>'
-        '<a class="mobile-nav-link plus" href="?nav=add_feed" aria-label="Add feed">+</a>'
-        f'<a class="mobile-nav-link{active["calm"]}" href="?nav=calm">Calm</a>'
-        f'<a class="mobile-nav-link{active["saved"]}" href="?nav=saved">Saved</a>'
+        f'<a class="mobile-nav-link{active["today"]}" href="?nav=today" target="_top">Today</a>'
+        f'<a class="mobile-nav-link{active["all"]}" href="?nav=all" target="_top">All</a>'
+        '<a class="mobile-nav-link plus" href="?nav=add_feed" target="_top" aria-label="Add feed">+</a>'
+        f'<a class="mobile-nav-link{active["calm"]}" href="?nav=calm" target="_top">Calm</a>'
+        f'<a class="mobile-nav-link{active["saved"]}" href="?nav=saved" target="_top">Saved</a>'
         '</nav></div></div>'
     )
 
