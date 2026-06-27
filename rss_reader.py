@@ -704,109 +704,119 @@ with st.sidebar:
 # Wrapping in a div.aurora-nav-sticky makes it sticky at top on mobile
 # ─────────────────────────────────────────────────────────────────────────────
 if st.session_state.layout == "mobile":
-    # Determine active tab
-    _cur = "Saved" if st.session_state.show_filter == "Saved" else (
+    # ── Liquid glass nav bar — Streamlit buttons = no URL redirect = instant ──
+    # The HTML div is purely visual; real buttons sit inside st.columns below it
+    _cur = "Saved" if st.session_state.get("show_filter") == "Saved" else (
         view if view in (TODAY, ALL, CALM_VIEW) else TODAY
     )
-    _active = {TODAY:"today", ALL:"feed", CALM_VIEW:"calm", "Feed":"feed"}.get(_cur, "today")
-    if st.session_state.get("show_filter") == "Saved": _active = "saved"
+    _ta = "today" if _cur == TODAY else "calm" if _cur == CALM_VIEW else "saved" if _cur == "Saved" else "today"
 
-    # Single st.html block — liquid glass nav with real links + hidden form for +
     st.html(f'''
 <style>
 #aurora-nav {{
-  position: sticky;
-  top: 0;
-  z-index: 99999;
-  margin: -.5rem -1rem .9rem;
-  padding: .55rem .8rem .5rem;
+  position: sticky; top: 0; z-index: 99999;
+  margin: -.5rem -1rem 0;
+  padding: .5rem .8rem .3rem;
   background: linear-gradient(135deg,rgba(255,255,255,.13),rgba(255,255,255,.04)),rgba(12,15,26,.72);
   backdrop-filter: blur(28px) saturate(180%);
   -webkit-backdrop-filter: blur(28px) saturate(180%);
   border-bottom: 1px solid rgba(255,255,255,.14);
-  box-shadow: 0 4px 32px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.2);
+  box-shadow: 0 4px 32px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.2);
+  pointer-events: none;
 }}
 @media (prefers-color-scheme:light) {{
-  #aurora-nav {{
-    background: linear-gradient(135deg,rgba(255,255,255,.75),rgba(255,255,255,.55)),rgba(244,244,240,.6);
-    border-bottom: 1px solid rgba(0,0,0,.08);
-    box-shadow: 0 4px 24px rgba(0,0,0,.07), inset 0 1px 0 rgba(255,255,255,.95);
-  }}
+  #aurora-nav {{ background:linear-gradient(135deg,rgba(255,255,255,.75),rgba(255,255,255,.55)),rgba(244,244,240,.6); border-bottom:1px solid rgba(0,0,0,.08); box-shadow:0 4px 24px rgba(0,0,0,.07),inset 0 1px 0 rgba(255,255,255,.95); }}
 }}
-.aurora-brand {{ display:flex; align-items:center; gap:.45rem; margin-bottom:.38rem; }}
-.aurora-mark {{
-  width:24px; height:24px; border-radius:7px; display:grid; place-items:center;
-  font-size:11px; color:#fff;
-  background:linear-gradient(135deg,#5b6fff,#c44eba 55%,#38d4be);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 3px 10px rgba(91,111,255,.4);
-}}
+.aurora-brand {{ display:flex; align-items:center; gap:.45rem; margin-bottom:.28rem; pointer-events:none; }}
+.aurora-mark {{ width:24px; height:24px; border-radius:7px; display:grid; place-items:center; font-size:11px; color:#fff; background:linear-gradient(135deg,#5b6fff,#c44eba 55%,#38d4be); box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 3px 10px rgba(91,111,255,.4); }}
 .aurora-title {{ font-family:"Libre Baskerville",Georgia,serif; font-weight:700; font-size:.95rem; color:var(--ink); }}
-.aurora-tabs {{
+.nav-pill-row {{
   display:flex; gap:.18rem; padding:.2rem;
   background:linear-gradient(135deg,rgba(255,255,255,.09),rgba(255,255,255,.03)),rgba(12,15,26,.38);
-  border:1px solid rgba(255,255,255,.13);
-  border-radius:999px;
+  border:1px solid rgba(255,255,255,.13); border-radius:999px;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.16);
+  pointer-events:none;
 }}
-.aurora-tab {{
-  flex:1; text-align:center; padding:.28rem .1rem;
-  border-radius:999px; border:1px solid transparent;
+.nav-pill {{
+  flex:1; text-align:center; padding:.26rem .1rem; border-radius:999px;
   font-size:.63rem; font-weight:800; letter-spacing:.04em;
-  color:rgba(200,200,220,.5); text-decoration:none;
-  transition:all .15s;
+  color:rgba(200,200,220,.45);
 }}
-.aurora-tab:hover {{ color:rgba(200,200,220,.8); }}
-.aurora-tab.active {{
-  color:#fff;
-  background:rgba(255,255,255,.15);
-  border-color:rgba(255,255,255,.2);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 2px 8px rgba(0,0,0,.18);
-}}
-.aurora-fab {{
-  flex:0 0 auto; width:34px; height:30px;
-  display:grid; place-items:center;
-  border-radius:999px;
+.nav-pill.active {{ color:#fff; background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.2); box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 2px 8px rgba(0,0,0,.18); }}
+.nav-pill-fab {{
+  flex:0 0 auto; width:34px; height:28px; border-radius:999px;
   background:linear-gradient(135deg,#5b6fff,#c44eba);
-  border:none; cursor:pointer; text-decoration:none;
-  font-size:1.1rem; color:#fff; line-height:1;
+  font-size:1.05rem; color:#fff; display:grid; place-items:center;
   box-shadow:0 2px 10px rgba(91,111,255,.5);
-  transition:transform .14s;
 }}
-.aurora-fab:active {{ transform:scale(.9); }}
-.aurora-tab {{ cursor:pointer; }}
 </style>
 <div id="aurora-nav">
   <div class="aurora-brand">
     <span class="aurora-mark">✦</span>
     <span class="aurora-title">Aurora</span>
   </div>
-  <div class="aurora-tabs">
-    <a href="?nav=today" class="aurora-tab {'active' if _active=='today' else ''}">Today</a>
-    <a href="?nav=feed"  class="aurora-tab {'active' if _active=='feed'  else ''}">Feed</a>
-    <a href="?nav=add"   class="aurora-fab">+</a>
-    <a href="?nav=calm"  class="aurora-tab {'active' if _active=='calm'  else ''}">Calm</a>
-    <a href="?nav=saved" class="aurora-tab {'active' if _active=='saved' else ''}">Saved</a>
+  <div class="nav-pill-row">
+    <span class="nav-pill {'active' if _ta=='today' else ''}">Today</span>
+    <span class="nav-pill-fab">+</span>
+    <span class="nav-pill {'active' if _ta=='calm'  else ''}">Calm</span>
+    <span class="nav-pill {'active' if _ta=='saved' else ''}">Saved</span>
   </div>
 </div>
 ''')
 
-    # Intercept ?nav= from nav bar links
-    _qs = st.query_params.get("nav", None)
-    if _qs:
-        _map = {"today":TODAY,"feed":ALL,"calm":CALM_VIEW}
-        if _qs == "add":
-            st.session_state.add_feed_open = not st.session_state.get("add_feed_open", False)
-        elif _qs == "saved":
-            st.session_state.show_filter = "Saved"
-            st.session_state.nav_to = TODAY
-            st.session_state.page = 1
-        elif _qs in _map:
-            st.session_state.nav_to = _map[_qs]
-            st.session_state.page = 1
-            st.session_state.show_filter = "All"
-            st.session_state.reset_source = True
-        st.query_params.clear()
-        st.rerun()
+    # Real Streamlit buttons overlaid on top — same position, transparent style
+    # These do instant session_state navigation without URL redirect
+    st.html("""<style>
+/* Make nav button row overlap the visual nav bar */
+div[data-testid="stHorizontalBlock"].nav-btn-row {
+  position: sticky;
+  top: 0;
+  z-index: 100000;
+  margin: -4.2rem -1rem .9rem !important;
+  padding: 2.85rem .5rem .22rem !important;
+  background: transparent !important;
+  gap: .18rem !important;
+}
+div[data-testid="stHorizontalBlock"].nav-btn-row button {
+  background: transparent !important;
+  border: none !important;
+  color: transparent !important;
+  box-shadow: none !important;
+  height: 28px !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border-radius: 999px !important;
+}
+</style>""")
+
+    with st.container():
+        st.markdown('<div class="nav-btn-row">', unsafe_allow_html=True)
+        nb1, nb2, nb3, nb4 = st.columns([1, 0.5, 1, 1], gap="small")
+        with nb1:
+            if st.button("Today", key="mnav_today", use_container_width=True):
+                st.session_state.nav_to = TODAY
+                st.session_state.page = 1
+                st.session_state.show_filter = "All"
+                st.session_state.reset_source = True
+                st.rerun()
+        with nb2:
+            if st.button("+", key="mnav_add", use_container_width=True):
+                st.session_state.add_feed_open = not st.session_state.get("add_feed_open", False)
+                st.rerun()
+        with nb3:
+            if st.button("Calm", key="mnav_calm", use_container_width=True):
+                st.session_state.nav_to = CALM_VIEW
+                st.session_state.page = 1
+                st.session_state.show_filter = "All"
+                st.session_state.reset_source = True
+                st.rerun()
+        with nb4:
+            if st.button("Saved", key="mnav_saved", use_container_width=True):
+                st.session_state.show_filter = "Saved"
+                st.session_state.nav_to = TODAY
+                st.session_state.page = 1
+                st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 
     # Add/remove feed panel
     if st.session_state.get("add_feed_open", False):
@@ -815,15 +825,15 @@ if st.session_state.layout == "mobile":
             with tab_a:
                 with st.form("m_add_form", clear_on_submit=True):
                     m_name = st.text_input("Source name", placeholder="e.g. Tortoise")
-                    m_url  = st.text_input("RSS URL", placeholder="https://…/feed")
-                    fo     = list(feeds.keys()) + ["➕ New section…"]
+                    m_url  = st.text_input("RSS URL", placeholder="https://\u2026/feed")
+                    fo     = list(feeds.keys()) + ["\u2795 New section\u2026"]
                     m_fold = st.selectbox("Section", fo)
-                    m_new  = st.text_input("New section name") if m_fold=="➕ New section…" else ""
+                    m_new  = st.text_input("New section name") if m_fold=="\u2795 New section\u2026" else ""
                     ca, cb = st.columns(2)
                     with ca: sub = st.form_submit_button("Add", use_container_width=True, type="primary")
                     with cb: can = st.form_submit_button("Cancel", use_container_width=True)
                     if sub:
-                        folder = m_new.strip() if m_fold=="➕ New section…" else m_fold
+                        folder = m_new.strip() if m_fold=="\u2795 New section\u2026" else m_fold
                         if m_name.strip() and m_url.strip() and folder:
                             feeds.setdefault(folder, [])
                             if not any(u==m_url.strip() for _,u in feeds[folder]):
@@ -835,13 +845,13 @@ if st.session_state.layout == "mobile":
                     if can:
                         st.session_state.add_feed_open = False; st.rerun()
             with tab_r:
-                labels = [f"{fold} · {nm}" for fold,items in feeds.items() for nm,_ in items]
+                labels = [f"{fold} \u00b7 {nm}" for fold,items in feeds.items() for nm,_ in items]
                 if labels:
                     rm = st.selectbox("Feed to remove", labels, label_visibility="collapsed")
                     cc, cd = st.columns(2)
                     with cc:
                         if st.button("Remove", use_container_width=True, type="primary", key="m_rm"):
-                            rfold, rname = [x.strip() for x in rm.split("·", 1)]
+                            rfold, rname = [x.strip() for x in rm.split("\u00b7", 1)]
                             feeds[rfold] = [(n,u) for n,u in feeds[rfold] if n!=rname]
                             if not feeds[rfold]: del feeds[rfold]
                             save_feeds(feeds, calm); fetch.clear()
@@ -850,6 +860,7 @@ if st.session_state.layout == "mobile":
                         if st.button("Cancel", use_container_width=True, key="m_rm_cancel"):
                             st.session_state.add_feed_open = False; st.rerun()
                 else: st.caption("No feeds yet.")
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────
