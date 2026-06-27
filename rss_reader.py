@@ -436,7 +436,7 @@ div[class*="AppDeployButton"] { display:none !important; }
 .ctitle { font-family:var(--serif); font-weight:700; font-size:.97rem; line-height:1.3; letter-spacing:-.01em; color:var(--ink); margin:.52rem 0 0; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
 
 /* Mobile liquid-glass nav */
-.mobile-nav-shell {
+.mobile-nav-brandbar {
   display:none;
   margin:-.35rem 0 1rem;
   padding:.48rem;
@@ -449,50 +449,50 @@ div[class*="AppDeployButton"] { display:none !important; }
   backdrop-filter:blur(24px) saturate(170%);
   -webkit-backdrop-filter:blur(24px) saturate(170%);
 }
-.mobile-nav-inner { display:grid; grid-template-columns:auto 1fr; align-items:center; gap:.55rem; }
-.mobile-nav-brand { display:flex; align-items:center; gap:.42rem; min-width:0; }
+.mobile-nav-brand { display:flex; align-items:center; gap:.5rem; min-width:0; margin-bottom:.46rem; }
 .mobile-nav-title { font-family:var(--serif); font-weight:700; font-size:1.08rem; color:var(--ink); white-space:nowrap; }
 .mobile-nav-mark {
   width:30px; height:30px; border-radius:9px; display:grid; place-items:center;
   font-size:14px; color:#fff; background:linear-gradient(135deg,#5b6fff,#c44eba 55%,#38d4be);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 6px 18px rgba(91,111,255,.34);
 }
-.mobile-nav-links {
-  display:grid;
-  grid-template-columns:repeat(5,minmax(0,1fr));
-  align-items:center;
-  gap:.24rem;
-  min-width:0;
-}
-.mobile-nav-link {
-  display:flex; align-items:center; justify-content:center;
-  min-width:0; min-height:34px; padding:0 .18rem;
-  border-radius:999px; text-decoration:none;
-  color:var(--ink-2); font-size:.69rem; font-weight:700;
-  border:1px solid transparent;
-  transition:background .15s,border-color .15s,color .15s,transform .15s;
-}
-.mobile-nav-link.active {
-  color:var(--ink);
-  background:rgba(255,255,255,.13);
-  border-color:rgba(255,255,255,.18);
+.mobile-nav-brandbar [data-testid="stMarkdownContainer"] p { margin:0; }
+[data-testid="stSegmentedControl"] { margin-bottom:.9rem; }
+[data-testid="stSegmentedControl"] div[role="radiogroup"] {
+  width:100%;
+  display:flex !important;
+  gap:.22rem;
+  padding:.28rem;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.14);
+  background:linear-gradient(135deg,rgba(255,255,255,.10),rgba(255,255,255,.035)),rgba(12,15,26,.42);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.22);
 }
-.mobile-nav-link:active { transform:scale(.96); }
-.mobile-nav-link.plus {
-  width:42px; min-height:42px; justify-self:center; padding:0;
-  color:#fff; font-size:1.25rem; line-height:1;
-  background:linear-gradient(135deg,#ff5f7e,#c44eba 48%,#5b6fff);
-  border-color:rgba(255,255,255,.24);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.42),0 8px 24px rgba(196,78,186,.38);
+[data-testid="stSegmentedControl"] div[role="radiogroup"] label {
+  flex:1 1 0;
+  min-width:0 !important;
+  justify-content:center !important;
+  border-radius:999px !important;
+  border:1px solid transparent !important;
+  color:var(--ink-2) !important;
+  font-weight:800 !important;
+  font-size:.69rem !important;
 }
-@media (max-width:768px) { .mobile-nav-shell { display:block; } }
+[data-testid="stSegmentedControl"] div[role="radiogroup"] label:has(input:checked) {
+  color:var(--ink) !important;
+  border-color:rgba(255,255,255,.18) !important;
+  background:rgba(255,255,255,.14) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22);
+}
+@media (max-width:768px) { .mobile-nav-brandbar { display:block; } }
 @media (max-width:430px) {
-  .mobile-nav-shell { border-radius:20px; padding:.42rem; }
-  .mobile-nav-inner { gap:.4rem; }
+  .mobile-nav-brandbar { border-radius:20px; padding:.42rem; }
   .mobile-nav-title { font-size:1rem; }
-  .mobile-nav-link { font-size:.62rem; min-height:32px; }
-  .mobile-nav-link.plus { width:38px; min-height:38px; }
+  [data-testid="stSegmentedControl"] div[role="radiogroup"] label {
+    font-size:.62rem !important;
+    padding-left:.14rem !important;
+    padding-right:.14rem !important;
+  }
 }
 
 /* ── Mobile card styles ── */
@@ -604,24 +604,40 @@ def go_to(target):
 def mobile_nav(current_view):
     if st.session_state.layout != "mobile":
         return
-    active = {
-        "today": " active" if current_view == TODAY and st.session_state.show_filter != "Saved" else "",
-        "all": " active" if current_view == ALL and st.session_state.show_filter != "Saved" else "",
-        "calm": " active" if current_view == CALM_VIEW and st.session_state.show_filter != "Saved" else "",
-        "saved": " active" if st.session_state.show_filter == "Saved" else "",
-    }
-    st.html(
-        '<div class="mobile-nav-shell"><div class="mobile-nav-inner">'
-        '<div class="mobile-nav-brand"><span class="mobile-nav-mark">✦</span>'
-        '<span class="mobile-nav-title">Aurora</span></div>'
-        '<nav class="mobile-nav-links" aria-label="Aurora navigation">'
-        f'<a class="mobile-nav-link{active["today"]}" href="?nav=today" target="_top">Today</a>'
-        f'<a class="mobile-nav-link{active["all"]}" href="?nav=all" target="_top">All</a>'
-        '<a class="mobile-nav-link plus" href="?nav=add_feed" target="_top" aria-label="Add feed">+</a>'
-        f'<a class="mobile-nav-link{active["calm"]}" href="?nav=calm" target="_top">Calm</a>'
-        f'<a class="mobile-nav-link{active["saved"]}" href="?nav=saved" target="_top">Saved</a>'
-        '</nav></div></div>'
+    choices = [TODAY, ALL, "+", CALM_VIEW, "Saved"]
+    current_choice = "Saved" if st.session_state.show_filter == "Saved" else (
+        current_view if current_view in (TODAY, ALL, CALM_VIEW) else TODAY
     )
+    nav_key = f"mobile_nav_choice_{current_choice}"
+    if st.session_state.get(nav_key) == "+":
+        st.session_state[nav_key] = current_choice
+
+    st.html(
+        '<div class="mobile-nav-brandbar"><div class="mobile-nav-brand">'
+        '<span class="mobile-nav-mark">✦</span>'
+        '<span class="mobile-nav-title">Aurora</span></div></div>'
+    )
+    nav_choice = st.segmented_control(
+        "Aurora navigation",
+        choices,
+        default=current_choice,
+        key=nav_key,
+        label_visibility="collapsed",
+    )
+    if not nav_choice or nav_choice == current_choice:
+        return
+    if nav_choice == "+":
+        st.session_state.add_feed_open = True
+        st.rerun()
+    if nav_choice == "Saved":
+        st.session_state.show_filter = "Saved"
+        st.session_state.page = 1
+        st.rerun()
+    st.session_state.nav_to = nav_choice
+    st.session_state.page = 1
+    st.session_state.show_filter = "All"
+    st.session_state.reset_source = True
+    st.rerun()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
