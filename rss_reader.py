@@ -609,6 +609,7 @@ all_sources           = [s for items in feeds.values() for s, _ in items]
 if "layout"        not in st.session_state: st.session_state.layout        = "mobile"
 if "nav_to"        not in st.session_state: st.session_state.nav_to        = None
 if "add_feed_open" not in st.session_state: st.session_state.add_feed_open = False
+if "search_open"   not in st.session_state: st.session_state.search_open   = False
 if "page"          not in st.session_state: st.session_state.page          = 1
 # Restore page from URL if set by infinite scroll
 _pg = st.query_params.get("page", None)
@@ -707,7 +708,7 @@ if st.session_state.layout == "mobile":
     _cur = "Saved" if st.session_state.get("show_filter") == "Saved" else (
         view if view in (TODAY, ALL, CALM_VIEW) else TODAY
     )
-    _ta = "today" if _cur == TODAY else "calm" if _cur == CALM_VIEW else "saved" if _cur == "Saved" else "today"
+    _ta = "today" if _cur == TODAY else "calm" if _cur == CALM_VIEW else "saved" if _cur == "Saved" else "search" if st.session_state.get("search_open") else "today"
 
     st.html(f'''
 <style>
@@ -757,6 +758,7 @@ if st.session_state.layout == "mobile":
   transition:transform .14s;
 }}
 .aurora-fab:active {{ transform:scale(.9); }}
+
 </style>
 <div id="aurora-nav">
   <div class="aurora-brand">
@@ -764,10 +766,11 @@ if st.session_state.layout == "mobile":
     <span class="aurora-title">Aurora</span>
   </div>
   <div class="aurora-tabs">
-    <a href="?nav=today" class="aurora-tab {'active' if _ta=='today' else ''}">Today</a>
-    <a href="?nav=add"   class="aurora-fab">+</a>
-    <a href="?nav=calm"  class="aurora-tab {'active' if _ta=='calm'  else ''}">Calm</a>
-    <a href="?nav=saved" class="aurora-tab {'active' if _ta=='saved' else ''}">Saved</a>
+    <a href="?nav=today"  class="aurora-tab {'active' if _ta=='today' else ''}">Today</a>
+    <a href="?nav=calm"   class="aurora-tab {'active' if _ta=='calm'  else ''}">Calm</a>
+    <a href="?nav=add"    class="aurora-fab">+</a>
+    <a href="?nav=search" class="aurora-tab {'active' if _ta=='search' else ''}">Search</a>
+    <a href="?nav=saved"  class="aurora-tab {'active' if _ta=='saved' else ''}">Saved</a>
   </div>
 </div>
 ''')
@@ -781,15 +784,19 @@ if st.session_state.layout == "mobile":
             st.session_state.show_filter = "Saved"
             st.session_state.nav_to = TODAY
             st.session_state.page = 1
+        elif _qs == "search":
+            st.session_state.search_open = not st.session_state.get("search_open", False)
         elif _qs == "today":
             st.session_state.nav_to = TODAY
             st.session_state.page = 1
             st.session_state.show_filter = "All"
+            st.session_state.search_open = False
             st.session_state.reset_source = True
         elif _qs == "calm":
             st.session_state.nav_to = CALM_VIEW
             st.session_state.page = 1
             st.session_state.show_filter = "All"
+            st.session_state.search_open = False
             st.session_state.reset_source = True
         st.query_params.clear()
         st.rerun()
@@ -883,14 +890,20 @@ st.html(
     f'<div class="masthead-rule"></div>'
 )
 
-# Show filter comes from nav bar (Saved tab) — no redundant buttons needed
+# Show filter comes from nav bar
 show = st.session_state.get("show_filter", "All")
-query=st.text_input("Search",placeholder="Search headlines…",label_visibility="collapsed")
 
-if show=="Saved":    articles=[a for a in articles if a["id"] in starred_set]
+# Search bar — only shown when Search tab is active
+query = ""
+if st.session_state.get("search_open", False):
+    query = st.text_input("Search", placeholder="Search headlines…",
+                          label_visibility="collapsed", key="search_input")
+
+if show == "Saved":
+    articles = [a for a in articles if a["id"] in starred_set]
 if query:
-    q=query.lower()
-    articles=[a for a in articles if q in a["title"].lower() or q in a["summary"].lower()]
+    q = query.lower()
+    articles = [a for a in articles if q in a["title"].lower() or q in a["summary"].lower()]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
