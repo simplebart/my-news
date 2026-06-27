@@ -798,17 +798,118 @@ header[data-testid="stHeader"] { background:transparent; }
   transition: opacity .2s;
 }
 #scroll-top:active::after { opacity: 1; }
+
+/* ── Bottom nav bar (mobile) ───────────────────────────────────── */
+#aurora-nav {
+  display: none;
+  position: fixed; bottom: 0; left: 0; right: 0;
+  height: 62px;
+  background: rgba(12,15,26,.92);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border-top: 1px solid rgba(255,255,255,.10);
+  z-index: 9000;
+  padding: 0 4px;
+  padding-bottom: env(safe-area-inset-bottom);
+  align-items: center; justify-content: space-around;
+}
+@media (prefers-color-scheme: light) {
+  #aurora-nav { background: rgba(244,244,240,.94); border-top: 1px solid rgba(0,0,0,.09); }
+}
+#aurora-nav.visible { display: flex; }
+
+.nav-btn {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px; flex: 1; height: 100%;
+  background: none; border: none; cursor: pointer;
+  color: rgba(180,180,200,.55);
+  font-size: .56rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+  -webkit-tap-highlight-color: transparent;
+  transition: color .12s;
+}
+.nav-btn svg { width: 22px; height: 22px; stroke-width: 1.7; fill: none; }
+.nav-btn.active { color: #fff; }
+@media (prefers-color-scheme: light) {
+  .nav-btn { color: rgba(60,60,80,.45); }
+  .nav-btn.active { color: #111; }
+}
+
+.nav-fab {
+  width: 48px; height: 48px; border-radius: 50%; flex-shrink: 0;
+  background: linear-gradient(135deg, #5b6fff, #c44eba);
+  border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 18px rgba(91,111,255,.5);
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .14s, box-shadow .14s;
+}
+.nav-fab:active { transform: scale(.91); box-shadow: 0 2px 8px rgba(91,111,255,.4); }
+.nav-fab svg { width: 22px; height: 22px; stroke: #fff; stroke-width: 2.2; fill: none; }
+
+body.has-nav [data-testid="stMainBlockContainer"] { padding-bottom: 84px !important; }
 </style>
 <script>
 (function(){
-  var btn = document.createElement("button");
-  btn.id = "scroll-top";
-  btn.setAttribute("aria-label", "Scroll to top");
-  btn.onclick = function(){ window.scrollTo({top:0,behavior:"smooth"}); };
-  document.body.appendChild(btn);
-  window.addEventListener("scroll", function(){
-    btn.classList.toggle("visible", window.scrollY > 200);
-  }, {passive:true});
+  /* Scroll to top */
+  var stBtn = document.createElement("button");
+  stBtn.id = "scroll-top";
+  stBtn.setAttribute("aria-label","Scroll to top");
+  stBtn.onclick = function(){ window.scrollTo({top:0,behavior:"smooth"}); };
+  document.body.appendChild(stBtn);
+  window.addEventListener("scroll",function(){
+    stBtn.classList.toggle("visible", window.scrollY > 200);
+  },{passive:true});
+
+  /* Bottom nav */
+  var ITEMS = [
+    {id:"today", label:"Today",
+     icon:'<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor"/><path d="M3 9h18M8 2v4M16 2v4" stroke="currentColor"/></svg>'},
+    {id:"all",   label:"All",
+     icon:'<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M4 6h16M4 12h16M4 18h10" stroke="currentColor"/></svg>'},
+    {id:"fab",   label:"", fab:true,
+     icon:'<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 5v14M5 12h14" stroke="currentColor"/></svg>'},
+    {id:"calm",  label:"Calm",
+     icon:'<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="9" stroke="currentColor"/><path d="M12 8v4l3 3" stroke="currentColor"/></svg>'},
+    {id:"saved", label:"Saved",
+     icon:'<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M5 3h14a1 1 0 011 1v17l-8-4-8 4V4a1 1 0 011-1z" stroke="currentColor"/></svg>'},
+  ];
+  var viewMap = {today:"Today",all:"All",calm:"Calm",saved:"Saved"};
+
+  function buildNav(){
+    var nav = document.createElement("div");
+    nav.id = "aurora-nav";
+    ITEMS.forEach(function(item){
+      if(item.fab){
+        var fab = document.createElement("button");
+        fab.className = "nav-fab";
+        fab.innerHTML = item.icon;
+        fab.setAttribute("aria-label","Add feed");
+        fab.onclick = function(){ window.sendPrompt("nav:add_feed"); };
+        nav.appendChild(fab);
+      } else {
+        var btn = document.createElement("button");
+        btn.className = "nav-btn";
+        btn.dataset.view = item.id;
+        btn.innerHTML = item.icon + "<span>" + item.label + "</span>";
+        btn.onclick = function(){
+          document.querySelectorAll(".nav-btn").forEach(function(b){ b.classList.remove("active"); });
+          this.classList.add("active");
+          window.sendPrompt("nav:" + viewMap[this.dataset.view]);
+        };
+        nav.appendChild(btn);
+      }
+    });
+    document.body.appendChild(nav);
+    nav.classList.add("visible");
+    document.body.classList.add("has-nav");
+    // Set Today as default active
+    var first = nav.querySelector(".nav-btn");
+    if(first) first.classList.add("active");
+  }
+
+  if(document.readyState === "loading"){
+    document.addEventListener("DOMContentLoaded", buildNav);
+  } else { buildNav(); }
 })();
 </script>
 """
@@ -823,9 +924,22 @@ starred_set = load_state()
 all_sources = [s for items in feeds.values() for s, _ in items]
 
 if "layout" not in st.session_state:
-    st.session_state.layout = "desktop"
+    st.session_state.layout = "mobile"
 if "nav_to" not in st.session_state:
     st.session_state.nav_to = None
+if "add_feed_open" not in st.session_state:
+    st.session_state.add_feed_open = False
+
+# Intercept nav bar messages from JS sendPrompt
+_qs = st.query_params.get("nav", None)
+if _qs:
+    _nav_map = {"Today": TODAY, "All": ALL, "Calm": CALM_VIEW,
+                "Saved": None, "add_feed": None}
+    if _qs == "add_feed":
+        st.session_state.add_feed_open = True
+    elif _qs in _nav_map and _nav_map[_qs]:
+        st.session_state.nav_to = _nav_map[_qs]
+    st.query_params.clear()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
