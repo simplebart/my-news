@@ -29,7 +29,7 @@ import streamlit as st
 MAX_PER_FEED   = 8
 SECTION_SIZE   = 5
 MAX_PER_SOURCE = 2
-PAGE_SIZE      = 30   # articles per "page" for infinite scroll
+PAGE_SIZE      = 30
 USER_NAME      = "Bart"
 
 MAX_PER_FEED_OVERRIDES = {"The Verge": 4, "Wired": 4}
@@ -179,9 +179,6 @@ def aid(link): return hashlib.md5((link or "").encode()).hexdigest()[:12]
 def toggle_star(i):
     s,r = load_state(); (s.discard if i in s else s.add)(i); save_state(s,r)
 
-def mark_read(i):
-    s,r = load_state(); r.add(i); save_state(s,r)
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Source helpers
@@ -307,7 +304,7 @@ def diverse_section(articles,n=SECTION_SIZE,max_per=MAX_PER_SOURCE):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Page config
+# Page config + CSS
 # ─────────────────────────────────────────────────────────────────────────────
 st.set_page_config(page_title="Aurora",page_icon="✦",layout="wide",
                    initial_sidebar_state="expanded")
@@ -323,7 +320,6 @@ CSS = """
   --gold:#f0c060; --serif:'Libre Baskerville',Georgia,serif;
   --sans:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
   --r:14px; --r-lg:20px;
-  --nav-h: 58px;
 }
 @media (prefers-color-scheme:light) {
   :root { --bg:#f4f4f0; --surface:rgba(0,0,0,.04); --card:#fff;
@@ -358,7 +354,7 @@ div[class*="AppDeployButton"] { display:none !important; }
 [data-testid="stSidebar"] { background:var(--surface) !important; border-right:1px solid var(--rule); backdrop-filter:blur(22px); }
 @media (max-width:768px) {
   [data-testid="stSidebar"] { display:none !important; }
-  [data-testid="stMainBlockContainer"] { padding-left:1rem !important; padding-right:1rem !important; padding-top:1rem !important; }
+  [data-testid="stMainBlockContainer"] { padding-left:1rem !important; padding-right:1rem !important; padding-top:.5rem !important; }
 }
 [data-testid="stSidebar"] * { color:var(--ink); }
 .brand { display:flex; align-items:center; gap:.5rem; padding:.2rem 0 .55rem; }
@@ -435,64 +431,99 @@ div[class*="AppDeployButton"] { display:none !important; }
 .cardlink .accent { height:3px; width:32px; border-radius:3px; margin:.1rem 0 .42rem; }
 .ctitle { font-family:var(--serif); font-weight:700; font-size:.97rem; line-height:1.3; letter-spacing:-.01em; color:var(--ink); margin:.52rem 0 0; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
 
-/* Mobile liquid-glass nav */
-.mobile-nav-brandbar {
-  display:none;
-  margin:-.35rem 0 1rem;
-  padding:.48rem;
-  border:1px solid rgba(255,255,255,.16);
-  border-radius:22px;
-  background:
-    linear-gradient(135deg,rgba(255,255,255,.14),rgba(255,255,255,.045)),
-    rgba(12,15,26,.52);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 16px 42px rgba(0,0,0,.26);
-  backdrop-filter:blur(24px) saturate(170%);
-  -webkit-backdrop-filter:blur(24px) saturate(170%);
+/* ── Mobile liquid-glass nav bar ─────────────────────────────────
+   Rendered as first element on mobile, sticky at top via CSS.
+   The outer div gets position:sticky via the .aurora-nav-sticky class.
+   ────────────────────────────────────────────────────────────── */
+.aurora-nav-sticky {
+  display: none;  /* hidden on desktop */
 }
-.mobile-nav-brand { display:flex; align-items:center; gap:.5rem; min-width:0; margin-bottom:.46rem; }
-.mobile-nav-title { font-family:var(--serif); font-weight:700; font-size:1.08rem; color:var(--ink); white-space:nowrap; }
-.mobile-nav-mark {
-  width:30px; height:30px; border-radius:9px; display:grid; place-items:center;
-  font-size:14px; color:#fff; background:linear-gradient(135deg,#5b6fff,#c44eba 55%,#38d4be);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 6px 18px rgba(91,111,255,.34);
-}
-.mobile-nav-brandbar [data-testid="stMarkdownContainer"] p { margin:0; }
-[data-testid="stSegmentedControl"] { margin-bottom:.9rem; }
-[data-testid="stSegmentedControl"] div[role="radiogroup"] {
-  width:100%;
-  display:flex !important;
-  gap:.22rem;
-  padding:.28rem;
-  border-radius:999px;
-  border:1px solid rgba(255,255,255,.14);
-  background:linear-gradient(135deg,rgba(255,255,255,.10),rgba(255,255,255,.035)),rgba(12,15,26,.42);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.22);
-}
-[data-testid="stSegmentedControl"] div[role="radiogroup"] label {
-  flex:1 1 0;
-  min-width:0 !important;
-  justify-content:center !important;
-  border-radius:999px !important;
-  border:1px solid transparent !important;
-  color:var(--ink-2) !important;
-  font-weight:800 !important;
-  font-size:.69rem !important;
-}
-[data-testid="stSegmentedControl"] div[role="radiogroup"] label:has(input:checked) {
-  color:var(--ink) !important;
-  border-color:rgba(255,255,255,.18) !important;
-  background:rgba(255,255,255,.14) !important;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.22);
-}
-@media (max-width:768px) { .mobile-nav-brandbar { display:block; } }
-@media (max-width:430px) {
-  .mobile-nav-brandbar { border-radius:20px; padding:.42rem; }
-  .mobile-nav-title { font-size:1rem; }
-  [data-testid="stSegmentedControl"] div[role="radiogroup"] label {
-    font-size:.62rem !important;
-    padding-left:.14rem !important;
-    padding-right:.14rem !important;
+@media (max-width: 768px) {
+  .aurora-nav-sticky {
+    display: block;
+    position: sticky;
+    top: 0;
+    z-index: 9999;
+    margin: -.5rem -1rem .8rem;
+    padding: .5rem .7rem .4rem;
+    background:
+      linear-gradient(135deg, rgba(255,255,255,.13), rgba(255,255,255,.04)),
+      rgba(12,15,26,.68);
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    border-bottom: 1px solid rgba(255,255,255,.13);
+    box-shadow: 0 4px 32px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.18);
   }
+  @media (prefers-color-scheme: light) {
+    .aurora-nav-sticky {
+      background: linear-gradient(135deg, rgba(255,255,255,.72), rgba(255,255,255,.52)), rgba(244,244,240,.6);
+      border-bottom: 1px solid rgba(0,0,0,.09);
+      box-shadow: 0 4px 24px rgba(0,0,0,.08), inset 0 1px 0 rgba(255,255,255,.9);
+    }
+  }
+}
+
+/* Brand row inside nav */
+.nav-brand-row {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  margin-bottom: .38rem;
+}
+.nav-mark {
+  width: 26px; height: 26px; border-radius: 8px;
+  display: grid; place-items: center;
+  font-size: 12px; color: #fff;
+  background: linear-gradient(135deg, #5b6fff, #c44eba 55%, #38d4be);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.4), 0 4px 14px rgba(91,111,255,.4);
+  flex-shrink: 0;
+}
+.nav-title {
+  font-family: var(--serif);
+  font-weight: 700; font-size: 1rem;
+  color: var(--ink); letter-spacing: -.01em;
+}
+
+/* Segmented control inside the nav — pill style */
+.aurora-nav-sticky [data-testid="stSegmentedControl"] {
+  margin-bottom: 0;
+}
+.aurora-nav-sticky [data-testid="stSegmentedControl"] div[role="radiogroup"] {
+  width: 100%;
+  display: flex !important;
+  gap: .18rem;
+  padding: .22rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: linear-gradient(135deg, rgba(255,255,255,.09), rgba(255,255,255,.03)), rgba(12,15,26,.38);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.18);
+}
+.aurora-nav-sticky [data-testid="stSegmentedControl"] div[role="radiogroup"] label {
+  flex: 1 1 0;
+  min-width: 0 !important;
+  justify-content: center !important;
+  border-radius: 999px !important;
+  border: 1px solid transparent !important;
+  color: rgba(200,200,220,.55) !important;
+  font-weight: 800 !important;
+  font-size: .67rem !important;
+  letter-spacing: .03em !important;
+  transition: all .15s !important;
+}
+.aurora-nav-sticky [data-testid="stSegmentedControl"] div[role="radiogroup"] label:has(input:checked) {
+  color: #fff !important;
+  border-color: rgba(255,255,255,.2) !important;
+  background: rgba(255,255,255,.15) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.25), 0 2px 8px rgba(0,0,0,.18) !important;
+}
+
+/* + button inside nav — gradient FAB */
+.aurora-nav-sticky [data-testid="stSegmentedControl"] div[role="radiogroup"] label:has(input[value="+"]):has(input:checked),
+.aurora-nav-sticky [data-testid="stSegmentedControl"] div[role="radiogroup"] label:has(input[value="+"]) {
+  background: linear-gradient(135deg, #5b6fff, #c44eba) !important;
+  color: #fff !important;
+  border-color: transparent !important;
+  box-shadow: 0 2px 12px rgba(91,111,255,.5) !important;
 }
 
 /* ── Mobile card styles ── */
@@ -543,10 +574,7 @@ div[class*="AppDeployButton"] { display:none !important; }
 [data-testid="stMain"] .stButton { display:flex; justify-content:flex-end; margin-top:.32rem; }
 [data-testid="stMain"] .stButton > button { width:auto; min-height:0; font-size:.71rem; font-weight:600; padding:.2rem .58rem; border-radius:999px; }
 
-/* Load more button */
-.load-more-btn { display:flex; justify-content:center; margin:1.5rem 0; }
-
-/* Empty / more */
+/* Empty */
 .empty { text-align:center; color:var(--ink-2); padding:4rem 1rem; }
 .empty .big { font-family:var(--serif); font-size:1.35rem; color:var(--ink); font-weight:700; margin-bottom:.4rem; }
 
@@ -557,17 +585,20 @@ div[class*="AppDeployButton"] { display:none !important; }
 [data-testid="stColumn"] > div[data-testid="stVerticalBlock"] { height:100%; display:flex; flex-direction:column; }
 [data-testid="stColumn"] [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:last-child,
 [data-testid="stColumn"] > div[data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:last-child { margin-top:auto; }
+
+/* Read JS */
+.feature.read,.panel.read,.cardlink.read,.m-hero.read,.m-pair-card.read,.m-list-card.read { opacity:.42; transition:opacity .2s; }
 </style>
 """
 st.html(CSS)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# State
+# State — init BEFORE sidebar so nav_to is available
 # ─────────────────────────────────────────────────────────────────────────────
-feeds, calm   = load_feeds()
+feeds, calm           = load_feeds()
 starred_set, read_set = load_state()
-all_sources   = [s for items in feeds.values() for s, _ in items]
+all_sources           = [s for items in feeds.values() for s, _ in items]
 
 if "layout"        not in st.session_state: st.session_state.layout        = "mobile"
 if "nav_to"        not in st.session_state: st.session_state.nav_to        = None
@@ -577,71 +608,9 @@ if "show_filter"   not in st.session_state: st.session_state.show_filter   = "Al
 if "last_filter"   not in st.session_state: st.session_state.last_filter   = None
 if "reset_source"  not in st.session_state: st.session_state.reset_source  = False
 
-# Intercept ?nav= query param (from mobile nav bar links)
-_qs = st.query_params.get("nav", None)
-if _qs:
-    _map = {"today":TODAY,"all":ALL,"calm":CALM_VIEW,"saved":None,"add_feed":None}
-    _key = _qs.lower()
-    if _key == "add_feed":
-        st.session_state.add_feed_open = True
-    elif _key == "saved":
-        st.session_state.show_filter = "Saved"
-        st.session_state.page = 1
-    elif _key in _map and _map[_key]:
-        st.session_state.nav_to = _map[_key]
-        st.session_state.page   = 1
-        st.session_state.reset_source = True
-    st.query_params.clear()
-    st.rerun()
-
-def go_to(target):
-    st.session_state.nav_to = target
-    st.session_state.page = 1
-    st.session_state.show_filter = "All"
-    st.session_state.reset_source = True
-    st.rerun()
-
-def mobile_nav(current_view):
-    if st.session_state.layout != "mobile":
-        return
-    choices = [TODAY, ALL, "+", CALM_VIEW, "Saved"]
-    current_choice = "Saved" if st.session_state.show_filter == "Saved" else (
-        current_view if current_view in (TODAY, ALL, CALM_VIEW) else TODAY
-    )
-    nav_key = f"mobile_nav_choice_{current_choice}"
-    if st.session_state.get(nav_key) == "+":
-        st.session_state[nav_key] = current_choice
-
-    st.html(
-        '<div class="mobile-nav-brandbar"><div class="mobile-nav-brand">'
-        '<span class="mobile-nav-mark">✦</span>'
-        '<span class="mobile-nav-title">Aurora</span></div></div>'
-    )
-    nav_choice = st.segmented_control(
-        "Aurora navigation",
-        choices,
-        default=current_choice,
-        key=nav_key,
-        label_visibility="collapsed",
-    )
-    if not nav_choice or nav_choice == current_choice:
-        return
-    if nav_choice == "+":
-        st.session_state.add_feed_open = True
-        st.rerun()
-    if nav_choice == "Saved":
-        st.session_state.show_filter = "Saved"
-        st.session_state.page = 1
-        st.rerun()
-    st.session_state.nav_to = nav_choice
-    st.session_state.page = 1
-    st.session_state.show_filter = "All"
-    st.session_state.reset_source = True
-    st.rerun()
-
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Sidebar
+# Sidebar (hidden on mobile via CSS)
 # ─────────────────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.html('<div class="brand"><div class="mark">✦</div><div class="name">Aurora</div></div>')
@@ -664,12 +633,10 @@ with st.sidebar:
         st.session_state.source_filter = ALL_SOURCES
     source = st.selectbox("Source", source_options, key="source_filter",
                           label_visibility="collapsed")
-    filter_key = (view, source)
-    if st.session_state.last_filter is None:
-        st.session_state.last_filter = filter_key
-    elif st.session_state.last_filter != filter_key:
-        st.session_state.page = 1
-        st.session_state.last_filter = filter_key
+    fk = (view, source)
+    if st.session_state.last_filter is None: st.session_state.last_filter = fk
+    elif st.session_state.last_filter != fk:
+        st.session_state.page = 1; st.session_state.last_filter = fk
 
     with st.expander("⚙︎  Manage feeds"):
         tab_add, tab_remove, tab_calm = st.tabs(["Add","Remove","Calm"])
@@ -720,52 +687,96 @@ with st.sidebar:
         if st.button("📱  Mobile",use_container_width=True,type="primary" if not is_desk else "secondary"):
             st.session_state.layout="mobile"; st.rerun()
 
-mobile_nav(view)
-
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Mobile add/remove panel (triggered by + nav button)
+# Mobile nav bar — rendered as FIRST element in main content
+# Wrapping in a div.aurora-nav-sticky makes it sticky at top on mobile
 # ─────────────────────────────────────────────────────────────────────────────
-if st.session_state.layout=="mobile" and st.session_state.get("add_feed_open",False):
-    with st.container(border=True):
-        tab_a,tab_r=st.tabs(["Add feed","Remove feed"])
-        with tab_a:
-            with st.form("m_add_form",clear_on_submit=True):
-                m_name=st.text_input("Source name",placeholder="e.g. Tortoise")
-                m_url =st.text_input("RSS URL",placeholder="https://…/feed")
-                fo=list(feeds.keys())+["➕ New section…"]
-                m_fold=st.selectbox("Section",fo)
-                m_new =st.text_input("New section name") if m_fold=="➕ New section…" else ""
-                ca,cb=st.columns(2)
-                with ca: sub=st.form_submit_button("Add",use_container_width=True,type="primary")
-                with cb: can=st.form_submit_button("Cancel",use_container_width=True)
-                if sub:
-                    folder=m_new.strip() if m_fold=="➕ New section…" else m_fold
-                    if m_name.strip() and m_url.strip() and folder:
-                        feeds.setdefault(folder,[])
-                        if not any(u==m_url.strip() for _,u in feeds[folder]):
-                            feeds[folder].append((m_name.strip(),m_url.strip()))
-                            save_feeds(feeds,calm); fetch.clear()
-                        st.session_state.add_feed_open=False
-                        st.success(f"Added {m_name.strip()}"); st.rerun()
-                    else: st.warning("Fill in all fields.")
-                if can: st.session_state.add_feed_open=False; st.rerun()
-        with tab_r:
-            labels=[f"{fold} · {nm}" for fold,items in feeds.items() for nm,_ in items]
-            if labels:
-                rm=st.selectbox("Feed to remove",labels,label_visibility="collapsed")
-                cc,cd=st.columns(2)
-                with cc:
-                    if st.button("Remove",use_container_width=True,type="primary",key="m_rm"):
-                        rfold,rname=[x.strip() for x in rm.split("·",1)]
-                        feeds[rfold]=[(n,u) for n,u in feeds[rfold] if n!=rname]
-                        if not feeds[rfold]: del feeds[rfold]
-                        save_feeds(feeds,calm); fetch.clear()
-                        st.session_state.add_feed_open=False; st.rerun()
-                with cd:
-                    if st.button("Cancel",use_container_width=True,key="m_rm_cancel"):
-                        st.session_state.add_feed_open=False; st.rerun()
-            else: st.caption("No feeds yet.")
+if st.session_state.layout == "mobile":
+    st.html('<div class="aurora-nav-sticky"><div class="nav-brand-row">'
+            '<span class="nav-mark">✦</span>'
+            '<span class="nav-title">Aurora</span>'
+            '</div></div>')
+
+    choices = [TODAY, ALL, "+", CALM_VIEW, "Saved"]
+    current_choice = "Saved" if st.session_state.show_filter == "Saved" else (
+        view if view in (TODAY, ALL, CALM_VIEW) else TODAY
+    )
+    nav_key = "mobile_nav_choice"
+
+    # Reset + if it was selected last time
+    if st.session_state.get(nav_key) == "+":
+        st.session_state[nav_key] = current_choice
+
+    # Wrap the segmented control in the sticky div via CSS class
+    st.html('<style>.aurora-nav-sticky + div { position:sticky; top:0; z-index:9999; }</style>')
+
+    nav_choice = st.segmented_control(
+        "Navigation",
+        choices,
+        default=current_choice,
+        key=nav_key,
+        label_visibility="collapsed",
+    )
+
+    if nav_choice and nav_choice != current_choice:
+        if nav_choice == "+":
+            st.session_state.add_feed_open = not st.session_state.get("add_feed_open", False)
+            st.session_state[nav_key] = current_choice
+            st.rerun()
+        elif nav_choice == "Saved":
+            st.session_state.show_filter = "Saved"
+            st.session_state.page = 1
+            st.rerun()
+        else:
+            st.session_state.nav_to = nav_choice
+            st.session_state.page = 1
+            st.session_state.show_filter = "All"
+            st.session_state.reset_source = True
+            st.rerun()
+
+    # Add/remove feed panel
+    if st.session_state.get("add_feed_open", False):
+        with st.container(border=True):
+            tab_a, tab_r = st.tabs(["Add feed", "Remove feed"])
+            with tab_a:
+                with st.form("m_add_form", clear_on_submit=True):
+                    m_name = st.text_input("Source name", placeholder="e.g. Tortoise")
+                    m_url  = st.text_input("RSS URL", placeholder="https://…/feed")
+                    fo     = list(feeds.keys()) + ["➕ New section…"]
+                    m_fold = st.selectbox("Section", fo)
+                    m_new  = st.text_input("New section name") if m_fold=="➕ New section…" else ""
+                    ca, cb = st.columns(2)
+                    with ca: sub = st.form_submit_button("Add", use_container_width=True, type="primary")
+                    with cb: can = st.form_submit_button("Cancel", use_container_width=True)
+                    if sub:
+                        folder = m_new.strip() if m_fold=="➕ New section…" else m_fold
+                        if m_name.strip() and m_url.strip() and folder:
+                            feeds.setdefault(folder, [])
+                            if not any(u==m_url.strip() for _,u in feeds[folder]):
+                                feeds[folder].append((m_name.strip(), m_url.strip()))
+                                save_feeds(feeds, calm); fetch.clear()
+                            st.session_state.add_feed_open = False
+                            st.success(f"Added {m_name.strip()}"); st.rerun()
+                        else: st.warning("Fill in all fields.")
+                    if can:
+                        st.session_state.add_feed_open = False; st.rerun()
+            with tab_r:
+                labels = [f"{fold} · {nm}" for fold,items in feeds.items() for nm,_ in items]
+                if labels:
+                    rm = st.selectbox("Feed to remove", labels, label_visibility="collapsed")
+                    cc, cd = st.columns(2)
+                    with cc:
+                        if st.button("Remove", use_container_width=True, type="primary", key="m_rm"):
+                            rfold, rname = [x.strip() for x in rm.split("·", 1)]
+                            feeds[rfold] = [(n,u) for n,u in feeds[rfold] if n!=rname]
+                            if not feeds[rfold]: del feeds[rfold]
+                            save_feeds(feeds, calm); fetch.clear()
+                            st.session_state.add_feed_open = False; st.rerun()
+                    with cd:
+                        if st.button("Cancel", use_container_width=True, key="m_rm_cancel"):
+                            st.session_state.add_feed_open = False; st.rerun()
+                else: st.caption("No feeds yet.")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -850,14 +861,13 @@ def _img_wrap(img_url,color,inits,wrap="img-wrap"):
             f'<img class="over" src="{img}" loading="lazy" onerror="{on_err}"></div>')
 
 def _read_cls(a): return " read" if a["id"] in read_set else ""
-def _read_attr(a): return f' onclick="markRead(\'{a["id"]}\')"'
 
 def feature_html(a,size="mid"):
     img=(a["image"] or "").replace("'","%27")
     dek=(f'<div class="fdek">{html.escape(a["summary"][:220])}</div>'
          if size=="cover" and a["summary"] else "")
     return (f'<a class="feature {size}{_read_cls(a)}" href="{html.escape(a["link"],quote=True)}"'
-            f' target="_blank" rel="noopener noreferrer"{_read_attr(a)}>'
+            f' target="_blank" rel="noopener noreferrer">'
             f'<div class="bg" style="background-color:{color_for(a["source"])};'
             f'background-image:url(\'{html.escape(img,quote=True)}\')"></div>'
             f'<div class="plate">{_kicker(a)}<div class="ft">{html.escape(a["title"])}</div>{dek}</div></a>')
@@ -865,19 +875,19 @@ def feature_html(a,size="mid"):
 def panel_html(a,size="mid"):
     dek=f'<div class="pdek">{html.escape(a["summary"][:240])}</div>' if a["summary"] else ""
     return (f'<a class="panel {size}{_read_cls(a)}" href="{html.escape(a["link"],quote=True)}"'
-            f' target="_blank" rel="noopener noreferrer" style="--c:{color_for(a["source"])}"{_read_attr(a)}>'
+            f' target="_blank" rel="noopener noreferrer" style="--c:{color_for(a["source"])}">'
             f'{_kicker(a)}<div class="pt">{html.escape(a["title"])}</div>{dek}</a>')
 
 def card_html(a):
     link=html.escape(a["link"],quote=True); title=html.escape(a["title"])
     color=color_for(a["source"]); inits=html.escape(initials(a["source"]))
-    rc=_read_cls(a); ra=_read_attr(a)
+    rc=_read_cls(a)
     if a["image"]:
         media=_img_wrap(a["image"],color,inits)
-        return (f'<a class="cardlink{rc}" href="{link}" target="_blank" rel="noopener noreferrer"{ra}>'
+        return (f'<a class="cardlink{rc}" href="{link}" target="_blank" rel="noopener noreferrer">'
                 f'{media}<div class="ctitle">{title}</div>{_chip(a)}</a>')
     accent=f'<div class="accent" style="background:{color}"></div>'
-    return (f'<a class="cardlink text{rc}" href="{link}" target="_blank" rel="noopener noreferrer"{ra}>'
+    return (f'<a class="cardlink text{rc}" href="{link}" target="_blank" rel="noopener noreferrer">'
             f'{accent}<div class="ctitle">{title}</div>{_chip(a)}</a>')
 
 def _m_img(img_url,color,inits,cls):
@@ -896,19 +906,19 @@ def _m_src(src_e,color,ago):
 def m_hero_html(a):
     link=html.escape(a["link"],quote=True); title=html.escape(a["title"])
     src=a["source"]; color=color_for(src); inits=html.escape(initials(src))
-    src_e=html.escape(src); ago=relative(a["time"]); rc=_read_cls(a); ra=_read_attr(a)
+    src_e=html.escape(src); ago=relative(a["time"]); rc=_read_cls(a)
     img=_m_img(a["image"],color,inits,"m-hero-img")
     img_w=img.replace("</div>",f'<div class="scrim"></div></div>',1)
     body=(f'<div class="m-hero-body">{_m_src(src_e,color,ago)}'
           f'<div class="m-hero-title">{title}</div></div>')
-    return f'<a class="m-hero{rc}" href="{link}" target="_blank" rel="noopener noreferrer"{ra}>{img_w}{body}</a>'
+    return f'<a class="m-hero{rc}" href="{link}" target="_blank" rel="noopener noreferrer">{img_w}{body}</a>'
 
 def m_pair_html(a):
     link=html.escape(a["link"],quote=True); title=html.escape(a["title"])
     src=a["source"]; color=color_for(src); inits=html.escape(initials(src))
-    src_e=html.escape(src); rc=_read_cls(a); ra=_read_attr(a)
+    src_e=html.escape(src); rc=_read_cls(a)
     img=_m_img(a["image"],color,inits,"m-pair-img")
-    return (f'<a class="m-pair-card{rc}" href="{link}" target="_blank" rel="noopener noreferrer"{ra}>'
+    return (f'<a class="m-pair-card{rc}" href="{link}" target="_blank" rel="noopener noreferrer">'
             f'{img}<div class="m-pair-body">'
             f'<div class="m-pair-src" style="color:{color}">{src_e}</div>'
             f'<div class="m-pair-title">{title}</div></div></a>')
@@ -916,43 +926,37 @@ def m_pair_html(a):
 def m_list_html(a):
     link=html.escape(a["link"],quote=True); title=html.escape(a["title"])
     src=a["source"]; color=color_for(src); inits=html.escape(initials(src))
-    src_e=html.escape(src); ago=relative(a["time"]); rc=_read_cls(a); ra=_read_attr(a)
+    src_e=html.escape(src); ago=relative(a["time"]); rc=_read_cls(a)
     thumb=_m_img(a["image"],color,inits,"m-list-thumb")
-    return (f'<a class="m-list-card{rc}" href="{link}" target="_blank" rel="noopener noreferrer"{ra}>'
+    return (f'<a class="m-list-card{rc}" href="{link}" target="_blank" rel="noopener noreferrer">'
             f'<div class="m-list-body">'
             f'<div class="m-list-src" style="color:{color}">{src_e}</div>'
             f'<div class="m-list-title">{title}</div>'
             f'<div class="m-list-ago">{ago}</div></div>{thumb}</a>')
 
-# Small JS to mark article as read (dims it) without a full Streamlit rerun
-READ_JS = """
-<script>
-function markRead(id){
-  // Store in sessionStorage so the dim persists during the session
-  var key = 'aurora_read_' + id;
-  if(!sessionStorage.getItem(key)){
-    sessionStorage.setItem(key,'1');
-    // Dim all elements with this article's id marker
-    document.querySelectorAll('[data-aid="'+id+'"]').forEach(function(el){
-      el.classList.add('read');
-    });
-  }
-}
-// On load, re-apply any reads from this session
+# Read tracking via sessionStorage — dims articles client-side instantly
+st.html("""<script>
 (function(){
-  for(var i=0;i<sessionStorage.length;i++){
-    var k=sessionStorage.key(i);
-    if(k && k.startsWith('aurora_read_')){
-      var id=k.replace('aurora_read_','');
-      document.querySelectorAll('[data-aid="'+id+'"]').forEach(function(el){
-        el.classList.add('read');
-      });
+  function applyReads(){
+    for(var i=0;i<sessionStorage.length;i++){
+      var k=sessionStorage.key(i);
+      if(k&&k.startsWith('aurora_r_')){
+        var id=k.slice(9);
+        document.querySelectorAll('a[href*="'+id+'"]').forEach(function(el){
+          el.classList.add('read');
+        });
+      }
     }
   }
+  document.addEventListener('click',function(e){
+    var a=e.target.closest('a[target="_blank"]');
+    if(a){ sessionStorage.setItem('aurora_r_'+a.href.slice(-12),'1'); a.classList.add('read'); }
+  });
+  applyReads();
+  // Re-apply after Streamlit rerenders
+  new MutationObserver(applyReads).observe(document.body,{childList:true,subtree:true});
 })();
-</script>
-"""
-st.html(READ_JS)
+</script>""")
 
 def actions(a):
     is_star=a["id"] in starred_set
@@ -1021,7 +1025,7 @@ def render_section_mobile(folder_items,section_size=SECTION_SIZE):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Render — with pagination (infinite-scroll via "Load more" button)
+# Render
 # ─────────────────────────────────────────────────────────────────────────────
 if not articles:
     msg=("No saved stories yet — tap Save on anything you want to keep."
