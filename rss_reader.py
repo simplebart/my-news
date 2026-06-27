@@ -773,28 +773,19 @@ if st.session_state.layout == "mobile":
   transition:transform .14s;
 }}
 .aurora-fab:active {{ transform:scale(.9); }}
-.aurora-tab, .aurora-fab {{ cursor:pointer; border:none; font-family:inherit; }}
-.aurora-tab {{ background:none; }}
+.aurora-tab {{ cursor:pointer; }}
 </style>
-<script>
-function navTo(v){{
-  // Use URL param so Streamlit picks it up — but keep RSS cache intact
-  var u = new URL(window.location.href);
-  u.searchParams.set("nav", v);
-  window.location.href = u.toString();
-}}
-</script>
 <div id="aurora-nav">
   <div class="aurora-brand">
     <span class="aurora-mark">✦</span>
     <span class="aurora-title">Aurora</span>
   </div>
   <div class="aurora-tabs">
-    <button onclick="navTo('today')" class="aurora-tab {'active' if _active=='today' else ''}">Today</button>
-    <button onclick="navTo('feed')"  class="aurora-tab {'active' if _active=='feed'  else ''}">Feed</button>
-    <button onclick="navTo('add')"   class="aurora-fab">+</button>
-    <button onclick="navTo('calm')"  class="aurora-tab {'active' if _active=='calm'  else ''}">Calm</button>
-    <button onclick="navTo('saved')" class="aurora-tab {'active' if _active=='saved' else ''}">Saved</button>
+    <a href="?nav=today" class="aurora-tab {'active' if _active=='today' else ''}">Today</a>
+    <a href="?nav=feed"  class="aurora-tab {'active' if _active=='feed'  else ''}">Feed</a>
+    <a href="?nav=add"   class="aurora-fab">+</a>
+    <a href="?nav=calm"  class="aurora-tab {'active' if _active=='calm'  else ''}">Calm</a>
+    <a href="?nav=saved" class="aurora-tab {'active' if _active=='saved' else ''}">Saved</a>
   </div>
 </div>
 ''')
