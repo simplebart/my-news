@@ -710,6 +710,18 @@ if st.session_state.layout == "mobile":
     )
     _ta = "today" if _cur == TODAY else "calm" if _cur == CALM_VIEW else "saved" if _cur == "Saved" else "search" if st.session_state.get("search_open") else "today"
 
+
+    # Build search slot — inline input or tab link
+    if st.session_state.get("search_open", False):
+        _search_slot = ('<form class="aurora-search-form" action="javascript:void(0)">'  
+                        '<input id="asearch" class="aurora-search-input" type="search" '
+                        'placeholder="Search\u2026" autofocus '
+                        'oninput="sessionStorage.setItem(\'aurora_q\',this.value)" '
+                        'onkeydown="if(event.key===\'Escape\'){window.location.href=\'?nav=search\'}" />'
+                        '</form>')
+    else:
+        _search_slot = '<a href="?nav=search" class="aurora-tab">Search</a>'
+
     st.html(f'''
 <style>
 #aurora-nav {{
@@ -766,11 +778,11 @@ if st.session_state.layout == "mobile":
     <span class="aurora-title">Aurora</span>
   </div>
   <div class="aurora-tabs">
-    <a href="?nav=today"  class="aurora-tab {'active' if _ta=='today' else ''}">Today</a>
-    <a href="?nav=calm"   class="aurora-tab {'active' if _ta=='calm'  else ''}">Calm</a>
-    <a href="?nav=add"    class="aurora-fab">+</a>
-    <a href="?nav=search" class="aurora-tab {'active' if _ta=='search' else ''}">Search</a>
-    <a href="?nav=saved"  class="aurora-tab {'active' if _ta=='saved' else ''}">Saved</a>
+    <a href="?nav=today" class="aurora-tab {'active' if _ta=='today' else ''}">Today</a>
+    <a href="?nav=calm"  class="aurora-tab {'active' if _ta=='calm'  else ''}">Calm</a>
+    <a href="?nav=add"   class="aurora-fab">+</a>
+    {_search_slot}
+    <a href="?nav=saved" class="aurora-tab {'active' if _ta=='saved' else ''}">Saved</a>
   </div>
 </div>
 ''')
@@ -893,11 +905,20 @@ st.html(
 # Show filter comes from nav bar
 show = st.session_state.get("show_filter", "All")
 
-# Search bar — only shown when Search tab is active
+# Search query comes from the inline nav input via sessionStorage
+# We use a hidden text input to sync the value on each rerun
 query = ""
 if st.session_state.get("search_open", False):
-    query = st.text_input("Search", placeholder="Search headlines…",
-                          label_visibility="collapsed", key="search_input")
+    # Tiny JS reads sessionStorage and puts it in a hidden Streamlit input
+    st.html("""<script>
+(function(){
+  var q = sessionStorage.getItem("aurora_q") || "";
+  var inputs = window.parent.document.querySelectorAll('input[data-testid="stTextInput"]');
+  inputs.forEach(function(i){ if(i.id && i.id.includes("hidden_q")){ i.value = q; i.dispatchEvent(new Event("input",{bubbles:true})); } });
+})();
+</script>""")
+    query = st.text_input("q", value="", key="hidden_q",
+                          label_visibility="collapsed") or ""
 
 if show == "Saved":
     articles = [a for a in articles if a["id"] in starred_set]
