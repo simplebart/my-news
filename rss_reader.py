@@ -693,47 +693,106 @@ with st.sidebar:
 # Wrapping in a div.aurora-nav-sticky makes it sticky at top on mobile
 # ─────────────────────────────────────────────────────────────────────────────
 if st.session_state.layout == "mobile":
-    st.html('<div class="aurora-nav-sticky"><div class="nav-brand-row">'
-            '<span class="nav-mark">✦</span>'
-            '<span class="nav-title">Aurora</span>'
-            '</div></div>')
-
-    choices = [TODAY, ALL, "+", CALM_VIEW, "Saved"]
-    current_choice = "Saved" if st.session_state.show_filter == "Saved" else (
+    # Determine active tab
+    _cur = "Saved" if st.session_state.show_filter == "Saved" else (
         view if view in (TODAY, ALL, CALM_VIEW) else TODAY
     )
-    nav_key = "mobile_nav_choice"
+    _active = {TODAY:"today", ALL:"all", CALM_VIEW:"calm"}.get(_cur, "today")
 
-    # Reset + if it was selected last time
-    if st.session_state.get(nav_key) == "+":
-        st.session_state[nav_key] = current_choice
+    # Single st.html block — liquid glass nav with real links + hidden form for +
+    st.html(f'''
+<style>
+#aurora-nav {{
+  position: sticky;
+  top: 0;
+  z-index: 99999;
+  margin: -.5rem -1rem .9rem;
+  padding: .55rem .8rem .5rem;
+  background: linear-gradient(135deg,rgba(255,255,255,.13),rgba(255,255,255,.04)),rgba(12,15,26,.72);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border-bottom: 1px solid rgba(255,255,255,.14);
+  box-shadow: 0 4px 32px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.2);
+}}
+@media (prefers-color-scheme:light) {{
+  #aurora-nav {{
+    background: linear-gradient(135deg,rgba(255,255,255,.75),rgba(255,255,255,.55)),rgba(244,244,240,.6);
+    border-bottom: 1px solid rgba(0,0,0,.08);
+    box-shadow: 0 4px 24px rgba(0,0,0,.07), inset 0 1px 0 rgba(255,255,255,.95);
+  }}
+}}
+.aurora-brand {{ display:flex; align-items:center; gap:.45rem; margin-bottom:.38rem; }}
+.aurora-mark {{
+  width:24px; height:24px; border-radius:7px; display:grid; place-items:center;
+  font-size:11px; color:#fff;
+  background:linear-gradient(135deg,#5b6fff,#c44eba 55%,#38d4be);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 3px 10px rgba(91,111,255,.4);
+}}
+.aurora-title {{ font-family:"Libre Baskerville",Georgia,serif; font-weight:700; font-size:.95rem; color:var(--ink); }}
+.aurora-tabs {{
+  display:flex; gap:.18rem; padding:.2rem;
+  background:linear-gradient(135deg,rgba(255,255,255,.09),rgba(255,255,255,.03)),rgba(12,15,26,.38);
+  border:1px solid rgba(255,255,255,.13);
+  border-radius:999px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.16);
+}}
+.aurora-tab {{
+  flex:1; text-align:center; padding:.28rem .1rem;
+  border-radius:999px; border:1px solid transparent;
+  font-size:.63rem; font-weight:800; letter-spacing:.04em;
+  color:rgba(200,200,220,.5); text-decoration:none;
+  transition:all .15s;
+}}
+.aurora-tab:hover {{ color:rgba(200,200,220,.8); }}
+.aurora-tab.active {{
+  color:#fff;
+  background:rgba(255,255,255,.15);
+  border-color:rgba(255,255,255,.2);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 2px 8px rgba(0,0,0,.18);
+}}
+.aurora-fab {{
+  flex:0 0 auto; width:34px; height:30px;
+  display:grid; place-items:center;
+  border-radius:999px;
+  background:linear-gradient(135deg,#5b6fff,#c44eba);
+  border:none; cursor:pointer; text-decoration:none;
+  font-size:1.1rem; color:#fff; line-height:1;
+  box-shadow:0 2px 10px rgba(91,111,255,.5);
+  transition:transform .14s;
+}}
+.aurora-fab:active {{ transform:scale(.9); }}
+</style>
+<div id="aurora-nav">
+  <div class="aurora-brand">
+    <span class="aurora-mark">✦</span>
+    <span class="aurora-title">Aurora</span>
+  </div>
+  <div class="aurora-tabs">
+    <a href="?nav=today" class="aurora-tab {'active' if _active=='today' else ''}">Today</a>
+    <a href="?nav=all"   class="aurora-tab {'active' if _active=='all'   else ''}">All</a>
+    <a href="?nav=add_feed" class="aurora-fab">+</a>
+    <a href="?nav=calm"  class="aurora-tab {'active' if _active=='calm'  else ''}">Calm</a>
+    <a href="?nav=saved" class="aurora-tab {'active' if _active=='saved' else ''}">Saved</a>
+  </div>
+</div>
+''')
 
-    # Wrap the segmented control in the sticky div via CSS class
-    st.html('<style>.aurora-nav-sticky + div { position:sticky; top:0; z-index:9999; }</style>')
-
-    nav_choice = st.segmented_control(
-        "Navigation",
-        choices,
-        default=current_choice,
-        key=nav_key,
-        label_visibility="collapsed",
-    )
-
-    if nav_choice and nav_choice != current_choice:
-        if nav_choice == "+":
+    # Intercept ?nav= from nav bar links
+    _qs = st.query_params.get("nav", None)
+    if _qs:
+        _map = {"today":TODAY,"all":ALL,"calm":CALM_VIEW}
+        if _qs == "add_feed":
             st.session_state.add_feed_open = not st.session_state.get("add_feed_open", False)
-            st.session_state[nav_key] = current_choice
-            st.rerun()
-        elif nav_choice == "Saved":
+        elif _qs == "saved":
             st.session_state.show_filter = "Saved"
             st.session_state.page = 1
-            st.rerun()
-        else:
-            st.session_state.nav_to = nav_choice
+        elif _qs in _map:
+            st.session_state.nav_to = _map[_qs]
             st.session_state.page = 1
             st.session_state.show_filter = "All"
             st.session_state.reset_source = True
-            st.rerun()
+        st.query_params.clear()
+        st.rerun()
 
     # Add/remove feed panel
     if st.session_state.get("add_feed_open", False):
