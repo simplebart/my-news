@@ -358,7 +358,7 @@ div[class*="AppDeployButton"] { display:none !important; }
 [data-testid="stSidebar"] { background:var(--surface) !important; border-right:1px solid var(--rule); backdrop-filter:blur(22px); }
 @media (max-width:768px) {
   [data-testid="stSidebar"] { display:none !important; }
-  [data-testid="stMainBlockContainer"] { padding-left:1rem !important; padding-right:1rem !important; padding-top:calc(var(--nav-h) + 12px) !important; }
+  [data-testid="stMainBlockContainer"] { padding-left:1rem !important; padding-right:1rem !important; padding-top:1rem !important; }
 }
 [data-testid="stSidebar"] * { color:var(--ink); }
 .brand { display:flex; align-items:center; gap:.5rem; padding:.2rem 0 .55rem; }
@@ -435,63 +435,16 @@ div[class*="AppDeployButton"] { display:none !important; }
 .cardlink .accent { height:3px; width:32px; border-radius:3px; margin:.1rem 0 .42rem; }
 .ctitle { font-family:var(--serif); font-weight:700; font-size:.97rem; line-height:1.3; letter-spacing:-.01em; color:var(--ink); margin:.52rem 0 0; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
 
-/* ── Mobile nav bar — FIXED TOP ── */
-#aurora-mobile-nav {
-  display: none;
-  position: fixed;
-  top: 0; left: 0; right: 0;
-  height: var(--nav-h);
-  z-index: 99999;
-  background: rgba(12,15,26,.82);
-  backdrop-filter: blur(28px) saturate(180%);
-  -webkit-backdrop-filter: blur(28px) saturate(180%);
-  border-bottom: 1px solid rgba(255,255,255,.12);
-  box-shadow: 0 2px 24px rgba(0,0,0,.32);
-  align-items: center;
-  justify-content: space-around;
-  padding: 0 6px;
-  padding-top: env(safe-area-inset-top);
-  gap: 2px;
+/* Mobile nav rendered with Streamlit widgets */
+.mobile-nav-shell { margin: -.45rem 0 .85rem; }
+.mobile-nav-title {
+  display:flex; align-items:center; gap:.45rem; margin-bottom:.45rem;
+  font-family:var(--serif); font-weight:700; font-size:1.08rem; color:var(--ink);
 }
-@media (prefers-color-scheme:light) {
-  #aurora-mobile-nav {
-    background: rgba(248,248,244,.88);
-    border-bottom: 1px solid rgba(0,0,0,.08);
-    box-shadow: 0 2px 16px rgba(0,0,0,.10);
-  }
+.mobile-nav-mark {
+  width:24px; height:24px; border-radius:7px; display:grid; place-items:center;
+  font-size:12px; color:#fff; background:linear-gradient(135deg,#5b6fff,#c44eba 55%,#38d4be);
 }
-@media (max-width:768px) { #aurora-mobile-nav { display:flex; } }
-
-.m-nav-item {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 3px; flex: 1; height: 100%;
-  text-decoration: none; background: none; border: none; cursor: pointer;
-  color: rgba(160,160,185,.55);
-  font-family: var(--sans); font-size: .52rem; font-weight: 700;
-  letter-spacing: .06em; text-transform: uppercase;
-  -webkit-tap-highlight-color: transparent;
-  transition: color .15s;
-  padding: 0;
-}
-.m-nav-item svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; }
-.m-nav-item.active { color: #fff; }
-@media (prefers-color-scheme:light) {
-  .m-nav-item { color: rgba(60,60,80,.4); }
-  .m-nav-item.active { color: #111; }
-}
-
-.m-nav-fab {
-  width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0;
-  background: linear-gradient(135deg, #5b6fff, #c44eba);
-  border: none; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 0 0 1px rgba(255,255,255,.18) inset, 0 4px 18px rgba(91,111,255,.55);
-  -webkit-tap-highlight-color: transparent;
-  transition: transform .14s, box-shadow .14s;
-  text-decoration: none;
-}
-.m-nav-fab:active { transform: scale(.9); }
-.m-nav-fab svg { width: 20px; height: 20px; fill: none; stroke: #fff; stroke-width: 2.2; }
 
 /* ── Mobile card styles ── */
 .m-section-head { display:flex; align-items:center; gap:.6rem; padding:.9rem 0 .6rem; margin-top:.2rem; border-top:1px solid var(--rule); }
@@ -556,69 +509,6 @@ div[class*="AppDeployButton"] { display:none !important; }
 [data-testid="stColumn"] [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:last-child,
 [data-testid="stColumn"] > div[data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:last-child { margin-top:auto; }
 </style>
-
-<!-- Fixed mobile nav bar injected into real DOM, outside Streamlit's iframe -->
-<script>
-(function(){
-  function buildNav(){
-    if(document.getElementById('aurora-mobile-nav')) return;
-    var nav = document.createElement('div');
-    nav.id = 'aurora-mobile-nav';
-
-    var ic = {
-      today: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>',
-      all:   '<svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',
-      plus:  '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
-      calm:  '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 3"/></svg>',
-      saved: '<svg viewBox="0 0 24 24"><path d="M5 3h14a1 1 0 011 1v17l-8-4-8 4V4a1 1 0 011-1z"/></svg>',
-    };
-
-    var items = [
-      {id:'today', label:'Today', icon:ic.today},
-      {id:'all',   label:'All',   icon:ic.all},
-      {id:'fab',   label:'',      icon:ic.plus, fab:true},
-      {id:'calm',  label:'Calm',  icon:ic.calm},
-      {id:'saved', label:'Saved', icon:ic.saved},
-    ];
-
-    items.forEach(function(item){
-      if(item.fab){
-        var fab = document.createElement('a');
-        fab.className = 'm-nav-fab';
-        fab.href = '?nav=add_feed';
-        fab.innerHTML = item.icon;
-        nav.appendChild(fab);
-      } else {
-        var btn = document.createElement('a');
-        btn.className = 'm-nav-item';
-        btn.href = '?nav=' + item.id;
-        btn.innerHTML = item.icon + '<span>' + item.label + '</span>';
-        btn.dataset.view = item.id;
-        nav.appendChild(btn);
-      }
-    });
-
-    // Highlight active tab based on URL param or default
-    function setActive(){
-      var p = new URLSearchParams(window.location.search).get('nav') || 'today';
-      nav.querySelectorAll('.m-nav-item').forEach(function(b){
-        b.classList.toggle('active', b.dataset.view === p.toLowerCase());
-      });
-    }
-    setActive();
-
-    document.body.appendChild(nav);
-  }
-
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', buildNav);
-  } else { buildNav(); }
-
-  // Re-run after Streamlit re-renders
-  var obs = new MutationObserver(buildNav);
-  obs.observe(document.body, {childList:true, subtree:false});
-})();
-</script>
 """
 st.html(CSS)
 
@@ -634,6 +524,9 @@ if "layout"        not in st.session_state: st.session_state.layout        = "mo
 if "nav_to"        not in st.session_state: st.session_state.nav_to        = None
 if "add_feed_open" not in st.session_state: st.session_state.add_feed_open = False
 if "page"          not in st.session_state: st.session_state.page          = 1
+if "show_filter"   not in st.session_state: st.session_state.show_filter   = "All"
+if "last_filter"   not in st.session_state: st.session_state.last_filter   = None
+if "reset_source"  not in st.session_state: st.session_state.reset_source  = False
 
 # Intercept ?nav= query param (from mobile nav bar links)
 _qs = st.query_params.get("nav", None)
@@ -642,11 +535,49 @@ if _qs:
     _key = _qs.lower()
     if _key == "add_feed":
         st.session_state.add_feed_open = True
+    elif _key == "saved":
+        st.session_state.show_filter = "Saved"
+        st.session_state.page = 1
     elif _key in _map and _map[_key]:
         st.session_state.nav_to = _map[_key]
         st.session_state.page   = 1
+        st.session_state.reset_source = True
     st.query_params.clear()
     st.rerun()
+
+def go_to(target):
+    st.session_state.nav_to = target
+    st.session_state.page = 1
+    st.session_state.show_filter = "All"
+    st.session_state.reset_source = True
+    st.rerun()
+
+def mobile_nav():
+    if st.session_state.layout != "mobile":
+        return
+    st.html('<div class="mobile-nav-shell"><div class="mobile-nav-title">'
+            '<span class="mobile-nav-mark">✦</span><span>Aurora</span></div></div>')
+    c_today,c_all,c_add,c_calm,c_saved = st.columns(5,gap="small")
+    with c_today:
+        if st.button("Today",use_container_width=True,key="mnav_today"):
+            go_to(TODAY)
+    with c_all:
+        if st.button("All",use_container_width=True,key="mnav_all"):
+            go_to(ALL)
+    with c_add:
+        if st.button("+",use_container_width=True,key="mnav_add"):
+            st.session_state.add_feed_open = True
+            st.rerun()
+    with c_calm:
+        if st.button("Calm",use_container_width=True,key="mnav_calm"):
+            go_to(CALM_VIEW)
+    with c_saved:
+        if st.button("Saved",use_container_width=True,key="mnav_saved"):
+            st.session_state.show_filter = "Saved"
+            st.session_state.page = 1
+            st.rerun()
+
+mobile_nav()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -666,7 +597,19 @@ with st.sidebar:
         else [s for s, _ in feeds.get(view, [])]
     )
     st.html('<div class="sidebar-cap">Source</div>')
-    source = st.selectbox("Source", [ALL_SOURCES, *view_sources], label_visibility="collapsed")
+    source_options = [ALL_SOURCES, *view_sources]
+    if st.session_state.pop("reset_source", False):
+        st.session_state.source_filter = ALL_SOURCES
+    if st.session_state.get("source_filter") not in source_options:
+        st.session_state.source_filter = ALL_SOURCES
+    source = st.selectbox("Source", source_options, key="source_filter",
+                          label_visibility="collapsed")
+    filter_key = (view, source)
+    if st.session_state.last_filter is None:
+        st.session_state.last_filter = filter_key
+    elif st.session_state.last_filter != filter_key:
+        st.session_state.page = 1
+        st.session_state.last_filter = filter_key
 
     with st.expander("⚙︎  Manage feeds"):
         tab_add, tab_remove, tab_calm = st.tabs(["Add","Remove","Calm"])
@@ -812,7 +755,7 @@ st.html(
 
 col_show,col_search=st.columns([1,3],gap="small")
 with col_show:
-    show=st.segmented_control("Show",["All","Saved"],default="All",
+    show=st.segmented_control("Show",["All","Saved"],key="show_filter",
                               label_visibility="collapsed") or "All"
 with col_search:
     query=st.text_input("Search",placeholder="Search headlines…",label_visibility="collapsed")
@@ -981,8 +924,8 @@ def render_small(a):
     with st.container(border=True):
         st.html(card_html(a)); actions(a)
 
-def render_section_desktop(folder_items,is_first=False):
-    items=diverse_section(folder_items)
+def render_section_desktop(folder_items,is_first=False,section_size=SECTION_SIZE):
+    items=diverse_section(folder_items,n=section_size)
     if not items: return
     render_big(items[0],size="cover" if is_first else "mid"); st.write("")
     if len(items)>=3:
@@ -992,17 +935,19 @@ def render_section_desktop(folder_items,is_first=False):
         st.write("")
     tail=items[3:]
     if tail:
-        cols=st.columns(len(tail),gap="medium")
-        for col,a in zip(cols,tail):
-            with col: render_small(a)
-        st.write("")
+        for start in range(0,len(tail),3):
+            row=tail[start:start+3]
+            cols=st.columns(len(row),gap="medium")
+            for col,a in zip(cols,row):
+                with col: render_small(a)
+            st.write("")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Mobile layout
 # ─────────────────────────────────────────────────────────────────────────────
-def render_section_mobile(folder_items):
-    items=diverse_section(folder_items)
+def render_section_mobile(folder_items,section_size=SECTION_SIZE):
+    items=diverse_section(folder_items,n=section_size)
     if not items: return
     st.html(m_hero_html(items[0]))
     if len(items)>=3:
@@ -1027,6 +972,7 @@ else:
     use_grouped  = view in (ALL,TODAY,CALM_VIEW) and source==ALL_SOURCES
     page         = st.session_state.get("page",1)
     visible      = articles[:PAGE_SIZE*page]
+    section_size = SECTION_SIZE*page
 
     if use_grouped:
         grouped=OrderedDict()
@@ -1035,13 +981,15 @@ else:
         for idx,(folder,folder_items) in enumerate(grouped.items()):
             if not folder_items: continue
             section_header(folder,desktop=not mobile_mode)
-            if mobile_mode: render_section_mobile(folder_items)
-            else:           render_section_desktop(folder_items,is_first=(idx==0))
+            if mobile_mode: render_section_mobile(folder_items,section_size=section_size)
+            else:           render_section_desktop(folder_items,is_first=(idx==0),section_size=section_size)
     else:
-        if not mobile_mode:
-            if st.button("← Today",key="back_to_today"):
-                st.session_state.nav_to=TODAY; st.session_state.page=1; st.rerun()
-            st.write("")
+        if st.button("← Today",key="back_to_today"):
+            st.session_state.nav_to=TODAY
+            st.session_state.page=1
+            st.session_state.reset_source=True
+            st.rerun()
+        st.write("")
         cover=next((a for a in visible if a["image"]),visible[0])
         rest =[a for a in visible if a is not cover]
         render_big(cover,size="cover"); st.write("")
