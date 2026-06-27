@@ -1316,10 +1316,13 @@ else:
                 f'Pick a section or search to go deeper.</div>')
 
 
+
+
 # ─────────────────────────────────────────────────────────────────────────────
-# Mobile bottom nav bar — rendered as st.html, works on Streamlit Cloud
+# Mobile top nav bar + add feed panel
 # ─────────────────────────────────────────────────────────────────────────────
 if st.session_state.layout == "mobile":
+
     # Handle incoming nav query param
     _nav_param = st.query_params.get("nav", None)
     if _nav_param:
@@ -1337,21 +1340,22 @@ if st.session_state.layout == "mobile":
         st.query_params.clear()
         st.rerun()
 
-    _cur = view  # highlight active tab
+    _cur = view
+
     def _nav_url(v):
         return f"?nav={v}"
 
-    _ic_today = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>'
-    _ic_all   = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" xmlns="http://www.w3.org/2000/svg"><path d="M4 6h16M4 12h16M4 18h10"/></svg>'
-    _ic_calm  = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 3"/></svg>'
-    _ic_saved = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" xmlns="http://www.w3.org/2000/svg"><path d="M5 3h14a1 1 0 011 1v17l-8-4-8 4V4a1 1 0 011-1z"/></svg>'
-    _ic_plus  = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" xmlns="http://www.w3.org/2000/svg"><path d="M12 5v14M5 12h14"/></svg>'
+    _ic_today = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>'
+    _ic_all   = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h10"/></svg>'
+    _ic_calm  = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 3"/></svg>'
+    _ic_saved = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 3h14a1 1 0 011 1v17l-8-4-8 4V4a1 1 0 011-1z"/></svg>'
+    _ic_plus  = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>'
 
     def _nav_item(icon, label, nav_val, active=False):
         color = "#fff" if active else "rgba(180,180,200,.55)"
         return (
-            f'<a href="{_nav_url(nav_val)}" class="m-nav-btn" style="color:{color}">'
-            f'{icon}<span>{label}</span></a>'
+            f'<a href="{_nav_url(nav_val)}" class="m-nav-btn" style="color:{color}" '
+            f'aria-label="{label}">{icon}<span>{label}</span></a>'
         )
 
     _today_active = _cur == TODAY
@@ -1360,48 +1364,87 @@ if st.session_state.layout == "mobile":
 
     _nav_html = f"""
 <style>
+/* ── Top nav bar ── */
 .m-nav-bar {{
-  position: fixed; bottom: 0; left: 0; right: 0;
-  height: 62px;
-  background: rgba(12,15,26,.94);
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 58px;
+  background: rgba(12,15,26,.95);
   backdrop-filter: blur(20px) saturate(160%);
   -webkit-backdrop-filter: blur(20px) saturate(160%);
-  border-top: 1px solid rgba(255,255,255,.10);
+  border-bottom: 1px solid rgba(255,255,255,.09);
   z-index: 9999;
   display: flex; align-items: center; justify-content: space-around;
-  padding: 0 4px;
-  padding-bottom: env(safe-area-inset-bottom);
+  padding: 0 6px;
+  padding-top: env(safe-area-inset-top);
 }}
 @media (prefers-color-scheme: light) {{
-  .m-nav-bar {{ background: rgba(244,244,240,.96); border-top: 1px solid rgba(0,0,0,.09); }}
+  .m-nav-bar {{
+    background: rgba(244,244,240,.97);
+    border-bottom: 1px solid rgba(0,0,0,.08);
+  }}
 }}
 .m-nav-btn {{
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 3px; flex: 1; height: 100%;
+  gap: 2px; flex: 1; height: 100%;
   text-decoration: none;
-  font-size: .56rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+  font-size: .53rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
   -webkit-tap-highlight-color: transparent;
   transition: color .12s;
 }}
-.m-nav-btn svg {{ width: 22px; height: 22px; }}
+.m-nav-btn svg {{ width: 20px; height: 20px; }}
 .m-nav-fab {{
-  width: 48px; height: 48px; border-radius: 50%; flex-shrink: 0;
+  width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0;
   background: linear-gradient(135deg, #5b6fff, #c44eba);
   display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 4px 18px rgba(91,111,255,.5);
+  box-shadow: 0 3px 14px rgba(91,111,255,.55);
   text-decoration: none;
   -webkit-tap-highlight-color: transparent;
+  transition: transform .14s;
 }}
-.m-nav-fab svg {{ width: 22px; height: 22px; }}
-/* Push page content up */
-body {{ padding-bottom: 80px !important; }}
+.m-nav-fab:active {{ transform: scale(.91); }}
+.m-nav-fab svg {{ width: 20px; height: 20px; }}
+/* Push content below nav */
+[data-testid="stMainBlockContainer"] {{
+  padding-top: 72px !important;
+}}
 </style>
 <div class="m-nav-bar">
   {_nav_item(_ic_today, "Today", "Today", _today_active)}
   {_nav_item(_ic_all,   "All",   "All",   _all_active)}
-  <a href="{_nav_url("add_feed")}" class="m-nav-fab">{_ic_plus}</a>
+  <a href="{_nav_url("add_feed")}" class="m-nav-fab" aria-label="Add feed">{_ic_plus}</a>
   {_nav_item(_ic_calm,  "Calm",  "Calm",  _calm_active)}
   {_nav_item(_ic_saved, "Saved", "Saved", False)}
 </div>
 """
     st.html(_nav_html)
+
+    # ── Add feed panel — opens when + is tapped ──
+    if st.session_state.get("add_feed_open", False):
+        st.markdown("---")
+        st.markdown("### ➕ Add a feed")
+
+        with st.form("mobile_add_feed"):
+            m_name = st.text_input("Source name", placeholder="e.g. Tortoise")
+            m_url  = st.text_input("RSS URL", placeholder="https://…/feed")
+            fold_opts = list(feeds.keys()) + ["➕ New section…"]
+            m_fold = st.selectbox("Section", fold_opts)
+            m_new  = st.text_input("New section name") if m_fold == "➕ New section…" else ""
+            submitted = st.form_submit_button("Add feed", use_container_width=True, type="primary")
+
+            if submitted:
+                folder = m_new.strip() if m_fold == "➕ New section…" else m_fold
+                if m_name.strip() and m_url.strip() and folder:
+                    feeds.setdefault(folder, [])
+                    if not any(u == m_url.strip() for _, u in feeds[folder]):
+                        feeds[folder].append((m_name.strip(), m_url.strip()))
+                        save_feeds(feeds, calm)
+                        fetch.clear()
+                    st.session_state.add_feed_open = False
+                    st.rerun()
+                else:
+                    st.warning("Name, URL and section are required.")
+
+        if st.button("✕ Cancel", use_container_width=True):
+            st.session_state.add_feed_open = False
+            st.rerun()
