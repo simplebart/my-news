@@ -119,13 +119,19 @@ def _gist_headers():
 def _gist_id():   return st.secrets.get("GIST_ID","")
 def _has_gist():  return bool(_gist_id() and st.secrets.get("GITHUB_TOKEN",""))
 
+@st.cache_data(ttl=60, show_spinner=False)
 def _gist_load():
+    """Cached Gist load — max 1 API call per minute regardless of reruns."""
     try:
         req = urllib.request.Request(f"https://api.github.com/gists/{_gist_id()}",headers=_gist_headers())
         with urllib.request.urlopen(req,timeout=6) as r:
             data = json.loads(r.read())
         return json.loads(data["files"]["aurora_feeds.json"]["content"])
     except: return None
+
+def _gist_bust():
+    """Call after a save to force fresh load next time."""
+    _gist_load.clear()
 
 def _gist_save(payload):
     try:
@@ -149,7 +155,7 @@ def load_feeds():
 
 def save_feeds(feeds,calm):
     payload={"feeds":{k:[list(p) for p in v] for k,v in feeds.items()},"calm":calm}
-    if _has_gist(): _gist_save(payload)
+    if _has_gist(): _gist_save(payload); _gist_bust()
     try:
         with open(FEEDS_PATH,"w",encoding="utf-8") as f: json.dump(payload,f,indent=2)
     except: pass
@@ -168,7 +174,7 @@ def save_state(starred, read):
         d = _gist_load() or {}
         d["starred"] = sorted(starred)
         d["read"]    = sorted(read)
-        _gist_save(d)
+        _gist_save(d); _gist_bust()
     try:
         with open(STATE_PATH,"w",encoding="utf-8") as f:
             json.dump({"starred":sorted(starred),"read":sorted(read)},f)
