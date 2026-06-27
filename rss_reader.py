@@ -496,6 +496,11 @@ header[data-testid="stHeader"] { background:transparent; }
   border-right:1px solid var(--rule);
   backdrop-filter:blur(22px);
 }
+/* Hide sidebar on mobile screens */
+@media (max-width: 768px) {
+  [data-testid="stSidebar"] { display: none !important; }
+  [data-testid="stMainBlockContainer"] { padding-left: 1rem !important; padding-right: 1rem !important; }
+}
 [data-testid="stSidebar"] * { color:var(--ink); }
 .brand { display:flex; align-items:center; gap:.5rem; padding:.2rem 0 .55rem; }
 .brand .mark {
@@ -884,7 +889,11 @@ body.has-nav [data-testid="stMainBlockContainer"] { padding-bottom: 84px !import
         fab.className = "nav-fab";
         fab.innerHTML = item.icon;
         fab.setAttribute("aria-label","Add feed");
-        fab.onclick = function(){ window.sendPrompt("nav:add_feed"); };
+        fab.onclick = function(){
+          var url = new URL(window.location.href);
+          url.searchParams.set('nav','add_feed');
+          window.location.href = url.toString();
+        };
         nav.appendChild(fab);
       } else {
         var btn = document.createElement("button");
@@ -894,7 +903,9 @@ body.has-nav [data-testid="stMainBlockContainer"] { padding-bottom: 84px !import
         btn.onclick = function(){
           document.querySelectorAll(".nav-btn").forEach(function(b){ b.classList.remove("active"); });
           this.classList.add("active");
-          window.sendPrompt("nav:" + viewMap[this.dataset.view]);
+          var url = new URL(window.location.href);
+          url.searchParams.set('nav', viewMap[this.dataset.view]);
+          window.location.href = url.toString();
         };
         nav.appendChild(btn);
       }
@@ -930,7 +941,7 @@ if "nav_to" not in st.session_state:
 if "add_feed_open" not in st.session_state:
     st.session_state.add_feed_open = False
 
-# Intercept nav bar messages from JS sendPrompt
+# Intercept nav bar messages from JS (via URL query params)
 _qs = st.query_params.get("nav", None)
 if _qs:
     _nav_map = {"Today": TODAY, "All": ALL, "Calm": CALM_VIEW,
