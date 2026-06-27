@@ -100,7 +100,7 @@ ACCENTS = {
     "Aeon":"#2E5FAB","The Atlantic":"#8B1A1A","The Race F1":"#E10600",
 }
 
-ALL, TODAY, CALM_VIEW, ALL_SOURCES = "All","Today","Calm","All sources"
+ALL, TODAY, CALM_VIEW, ALL_SOURCES = "Feed","Today","Calm","All sources"
 SMART = [TODAY, ALL, CALM_VIEW]
 
 HERE       = os.path.dirname(os.path.abspath(__file__))
@@ -610,6 +610,11 @@ if "layout"        not in st.session_state: st.session_state.layout        = "mo
 if "nav_to"        not in st.session_state: st.session_state.nav_to        = None
 if "add_feed_open" not in st.session_state: st.session_state.add_feed_open = False
 if "page"          not in st.session_state: st.session_state.page          = 1
+# Restore page from URL if set by infinite scroll
+_pg = st.query_params.get("page", None)
+if _pg:
+    try: st.session_state.page = max(1, int(_pg))
+    except: pass
 if "show_filter"   not in st.session_state: st.session_state.show_filter   = "All"
 if "last_filter"   not in st.session_state: st.session_state.last_filter   = None
 if "reset_source"  not in st.session_state: st.session_state.reset_source  = False
@@ -703,7 +708,8 @@ if st.session_state.layout == "mobile":
     _cur = "Saved" if st.session_state.show_filter == "Saved" else (
         view if view in (TODAY, ALL, CALM_VIEW) else TODAY
     )
-    _active = {TODAY:"today", ALL:"all", CALM_VIEW:"calm"}.get(_cur, "today")
+    _active = {TODAY:"today", ALL:"feed", CALM_VIEW:"calm", "Feed":"feed"}.get(_cur, "today")
+    if st.session_state.get("show_filter") == "Saved": _active = "saved"
 
     # Single st.html block — liquid glass nav with real links + hidden form for +
     st.html(f'''
@@ -767,18 +773,28 @@ if st.session_state.layout == "mobile":
   transition:transform .14s;
 }}
 .aurora-fab:active {{ transform:scale(.9); }}
+.aurora-tab, .aurora-fab {{ cursor:pointer; border:none; font-family:inherit; }}
+.aurora-tab {{ background:none; }}
 </style>
+<script>
+function navTo(v){{
+  // Use URL param so Streamlit picks it up — but keep RSS cache intact
+  var u = new URL(window.location.href);
+  u.searchParams.set("nav", v);
+  window.location.href = u.toString();
+}}
+</script>
 <div id="aurora-nav">
   <div class="aurora-brand">
     <span class="aurora-mark">✦</span>
     <span class="aurora-title">Aurora</span>
   </div>
   <div class="aurora-tabs">
-    <a href="?nav=today" class="aurora-tab {'active' if _active=='today' else ''}">Today</a>
-    <a href="?nav=all"   class="aurora-tab {'active' if _active=='all'   else ''}">All</a>
-    <a href="?nav=add_feed" class="aurora-fab">+</a>
-    <a href="?nav=calm"  class="aurora-tab {'active' if _active=='calm'  else ''}">Calm</a>
-    <a href="?nav=saved" class="aurora-tab {'active' if _active=='saved' else ''}">Saved</a>
+    <button onclick="navTo('today')" class="aurora-tab {'active' if _active=='today' else ''}">Today</button>
+    <button onclick="navTo('feed')"  class="aurora-tab {'active' if _active=='feed'  else ''}">Feed</button>
+    <button onclick="navTo('add')"   class="aurora-fab">+</button>
+    <button onclick="navTo('calm')"  class="aurora-tab {'active' if _active=='calm'  else ''}">Calm</button>
+    <button onclick="navTo('saved')" class="aurora-tab {'active' if _active=='saved' else ''}">Saved</button>
   </div>
 </div>
 ''')
@@ -786,11 +802,12 @@ if st.session_state.layout == "mobile":
     # Intercept ?nav= from nav bar links
     _qs = st.query_params.get("nav", None)
     if _qs:
-        _map = {"today":TODAY,"all":ALL,"calm":CALM_VIEW}
-        if _qs == "add_feed":
+        _map = {"today":TODAY,"feed":ALL,"calm":CALM_VIEW}
+        if _qs == "add":
             st.session_state.add_feed_open = not st.session_state.get("add_feed_open", False)
         elif _qs == "saved":
             st.session_state.show_filter = "Saved"
+            st.session_state.nav_to = TODAY
             st.session_state.page = 1
         elif _qs in _map:
             st.session_state.nav_to = _map[_qs]
@@ -891,12 +908,9 @@ st.html(
     f'<div class="masthead-rule"></div>'
 )
 
-col_show,col_search=st.columns([1,3],gap="small")
-with col_show:
-    show=st.segmented_control("Show",["All","Saved"],key="show_filter",
-                              label_visibility="collapsed") or "All"
-with col_search:
-    query=st.text_input("Search",placeholder="Search headlines…",label_visibility="collapsed")
+# Show filter comes from nav bar (Saved tab) — no redundant buttons needed
+show = st.session_state.get("show_filter", "All")
+query=st.text_input("Search",placeholder="Search headlines…",label_visibility="collapsed")
 
 if show=="Saved":    articles=[a for a in articles if a["id"] in starred_set]
 if query:
@@ -1148,12 +1162,23 @@ else:
                     with cols[k]: render_small(a)
             st.write("")
 
-    # Load more
-    if len(articles)>len(visible):
-        remaining=len(articles)-len(visible)
-        st.write("")
-        col_c,_,col_r=st.columns([1,2,1])
-        with col_c:
-            if st.button(f"Load {min(PAGE_SIZE,remaining)} more",
-                         use_container_width=True,key="load_more"):
-                st.session_state.page=page+1; st.rerun()
+    # Infinite scroll sentinel — JS watches it and triggers next page via URL
+    if len(articles) > len(visible):
+        st.html(f"""
+<div id="aurora-sentinel" style="height:2px;margin:2rem 0;"></div>
+<script>
+(function(){{
+  var s = document.getElementById('aurora-sentinel');
+  if(!s) return;
+  var io = new IntersectionObserver(function(entries){{
+    if(entries[0].isIntersecting){{
+      io.disconnect();
+      var u = new URL(window.location.href);
+      u.searchParams.set('page', '{page+1}');
+      window.location.href = u.toString();
+    }}
+  }}, {{rootMargin:'400px'}});
+  io.observe(s);
+}})();
+</script>
+""")
