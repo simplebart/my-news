@@ -435,15 +435,64 @@ div[class*="AppDeployButton"] { display:none !important; }
 .cardlink .accent { height:3px; width:32px; border-radius:3px; margin:.1rem 0 .42rem; }
 .ctitle { font-family:var(--serif); font-weight:700; font-size:.97rem; line-height:1.3; letter-spacing:-.01em; color:var(--ink); margin:.52rem 0 0; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
 
-/* Mobile nav rendered with Streamlit widgets */
-.mobile-nav-shell { margin: -.45rem 0 .85rem; }
-.mobile-nav-title {
-  display:flex; align-items:center; gap:.45rem; margin-bottom:.45rem;
-  font-family:var(--serif); font-weight:700; font-size:1.08rem; color:var(--ink);
+/* Mobile liquid-glass nav */
+.mobile-nav-shell {
+  display:none;
+  margin:-.35rem 0 1rem;
+  padding:.48rem;
+  border:1px solid rgba(255,255,255,.16);
+  border-radius:22px;
+  background:
+    linear-gradient(135deg,rgba(255,255,255,.14),rgba(255,255,255,.045)),
+    rgba(12,15,26,.52);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 16px 42px rgba(0,0,0,.26);
+  backdrop-filter:blur(24px) saturate(170%);
+  -webkit-backdrop-filter:blur(24px) saturate(170%);
 }
+.mobile-nav-inner { display:grid; grid-template-columns:auto 1fr; align-items:center; gap:.55rem; }
+.mobile-nav-brand { display:flex; align-items:center; gap:.42rem; min-width:0; }
+.mobile-nav-title { font-family:var(--serif); font-weight:700; font-size:1.08rem; color:var(--ink); white-space:nowrap; }
 .mobile-nav-mark {
-  width:24px; height:24px; border-radius:7px; display:grid; place-items:center;
-  font-size:12px; color:#fff; background:linear-gradient(135deg,#5b6fff,#c44eba 55%,#38d4be);
+  width:30px; height:30px; border-radius:9px; display:grid; place-items:center;
+  font-size:14px; color:#fff; background:linear-gradient(135deg,#5b6fff,#c44eba 55%,#38d4be);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 6px 18px rgba(91,111,255,.34);
+}
+.mobile-nav-links {
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  align-items:center;
+  gap:.24rem;
+  min-width:0;
+}
+.mobile-nav-link {
+  display:flex; align-items:center; justify-content:center;
+  min-width:0; min-height:34px; padding:0 .18rem;
+  border-radius:999px; text-decoration:none;
+  color:var(--ink-2); font-size:.69rem; font-weight:700;
+  border:1px solid transparent;
+  transition:background .15s,border-color .15s,color .15s,transform .15s;
+}
+.mobile-nav-link.active {
+  color:var(--ink);
+  background:rgba(255,255,255,.13);
+  border-color:rgba(255,255,255,.18);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22);
+}
+.mobile-nav-link:active { transform:scale(.96); }
+.mobile-nav-link.plus {
+  width:42px; min-height:42px; justify-self:center; padding:0;
+  color:#fff; font-size:1.25rem; line-height:1;
+  background:linear-gradient(135deg,#ff5f7e,#c44eba 48%,#5b6fff);
+  border-color:rgba(255,255,255,.24);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.42),0 8px 24px rgba(196,78,186,.38);
+}
+@media (max-width:768px) { .mobile-nav-shell { display:block; } }
+@media (max-width:430px) {
+  .mobile-nav-shell { border-radius:20px; padding:.42rem; }
+  .mobile-nav-inner { gap:.4rem; }
+  .mobile-nav-title { font-size:1rem; }
+  .mobile-nav-link { font-size:.62rem; min-height:32px; }
+  .mobile-nav-link.plus { width:38px; min-height:38px; }
 }
 
 /* ── Mobile card styles ── */
@@ -552,32 +601,27 @@ def go_to(target):
     st.session_state.reset_source = True
     st.rerun()
 
-def mobile_nav():
+def mobile_nav(current_view):
     if st.session_state.layout != "mobile":
         return
-    st.html('<div class="mobile-nav-shell"><div class="mobile-nav-title">'
-            '<span class="mobile-nav-mark">✦</span><span>Aurora</span></div></div>')
-    c_today,c_all,c_add,c_calm,c_saved = st.columns(5,gap="small")
-    with c_today:
-        if st.button("Today",use_container_width=True,key="mnav_today"):
-            go_to(TODAY)
-    with c_all:
-        if st.button("All",use_container_width=True,key="mnav_all"):
-            go_to(ALL)
-    with c_add:
-        if st.button("+",use_container_width=True,key="mnav_add"):
-            st.session_state.add_feed_open = True
-            st.rerun()
-    with c_calm:
-        if st.button("Calm",use_container_width=True,key="mnav_calm"):
-            go_to(CALM_VIEW)
-    with c_saved:
-        if st.button("Saved",use_container_width=True,key="mnav_saved"):
-            st.session_state.show_filter = "Saved"
-            st.session_state.page = 1
-            st.rerun()
-
-mobile_nav()
+    active = {
+        "today": " active" if current_view == TODAY and st.session_state.show_filter != "Saved" else "",
+        "all": " active" if current_view == ALL and st.session_state.show_filter != "Saved" else "",
+        "calm": " active" if current_view == CALM_VIEW and st.session_state.show_filter != "Saved" else "",
+        "saved": " active" if st.session_state.show_filter == "Saved" else "",
+    }
+    st.html(
+        '<div class="mobile-nav-shell"><div class="mobile-nav-inner">'
+        '<div class="mobile-nav-brand"><span class="mobile-nav-mark">✦</span>'
+        '<span class="mobile-nav-title">Aurora</span></div>'
+        '<nav class="mobile-nav-links" aria-label="Aurora navigation">'
+        f'<a class="mobile-nav-link{active["today"]}" href="?nav=today">Today</a>'
+        f'<a class="mobile-nav-link{active["all"]}" href="?nav=all">All</a>'
+        '<a class="mobile-nav-link plus" href="?nav=add_feed" aria-label="Add feed">+</a>'
+        f'<a class="mobile-nav-link{active["calm"]}" href="?nav=calm">Calm</a>'
+        f'<a class="mobile-nav-link{active["saved"]}" href="?nav=saved">Saved</a>'
+        '</nav></div></div>'
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -659,6 +703,8 @@ with st.sidebar:
     with lc2:
         if st.button("📱  Mobile",use_container_width=True,type="primary" if not is_desk else "secondary"):
             st.session_state.layout="mobile"; st.rerun()
+
+mobile_nav(view)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
