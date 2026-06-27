@@ -1317,74 +1317,76 @@ else:
 
 
 
-
 # ─────────────────────────────────────────────────────────────────────────────
-# Mobile top nav — real Streamlit buttons, always work
+# Mobile top nav — styled Streamlit buttons pinned to top
 # ─────────────────────────────────────────────────────────────────────────────
 if st.session_state.layout == "mobile":
 
-    # Style the nav bar
+    # CSS to style the nav buttons and pin the row to top
     st.html("""
 <style>
-/* Sticky top bar wrapper */
-div[data-testid="stHorizontalBlock"]:has(button[key^="mnav_"]) {
-  position: sticky; top: 0; z-index: 999;
-  background: rgba(12,15,26,.95);
-  backdrop-filter: blur(20px);
+/* Pin the nav button row to top */
+div[data-testid="stHorizontalBlock"]:has(> div > div > button[data-testid="stBaseButton-secondary"][kind="secondary"]) {
+  position: sticky;
+  top: 0;
+  z-index: 9999;
+  background: rgba(12,15,26,.96);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
   border-bottom: 1px solid rgba(255,255,255,.09);
-  padding: 6px 4px !important;
-  margin: -1rem -1rem .5rem !important;
+  margin: -1rem -1rem .8rem !important;
+  padding: 8px 10px !important;
 }
 @media (prefers-color-scheme: light) {
-  div[data-testid="stHorizontalBlock"]:has(button[key^="mnav_"]) {
-    background: rgba(244,244,240,.97);
+  div[data-testid="stHorizontalBlock"]:has(> div > div > button[data-testid="stBaseButton-secondary"][kind="secondary"]) {
+    background: rgba(248,248,245,.97);
     border-bottom: 1px solid rgba(0,0,0,.08);
   }
-}
-/* Nav buttons */
-button[key^="mnav_"] {
-  border-radius: 10px !important;
-  border: none !important;
-  background: transparent !important;
-  color: rgba(180,180,200,.55) !important;
-  font-size: .58rem !important; font-weight: 700 !important;
-  letter-spacing: .05em !important; text-transform: uppercase !important;
-  padding: .3rem .1rem !important;
-  width: 100% !important;
-}
-button[key^="mnav_"]:hover {
-  background: rgba(255,255,255,.06) !important;
-  color: #fff !important;
-}
-/* FAB — plus button */
-button[key="mnav_add"] {
-  background: linear-gradient(135deg, #5b6fff, #c44eba) !important;
-  border-radius: 50% !important;
-  color: #fff !important;
-  font-size: 1.2rem !important;
-  padding: .2rem !important;
-  box-shadow: 0 3px 14px rgba(91,111,255,.55) !important;
 }
 </style>
 """)
 
-    # Build nav columns: Today | All | + | Calm | Saved
-    nc1, nc2, nc3, nc4, nc5 = st.columns([1,1,.7,1,1], gap="small")
+    # Active view label
+    _active_color  = "#ffffff"
+    _inactive_color = "rgba(160,160,180,.5)"
+
+    # Nav row — 5 equal columns
+    nc1, nc2, nc3, nc4, nc5 = st.columns(5, gap="small")
 
     with nc1:
-        if st.button("Today", key="mnav_today", use_container_width=True):
+        _t = "**Today**" if view == TODAY else "Today"
+        if st.button(_t, key="mnav_today", use_container_width=True):
             st.session_state.nav_to = TODAY
             st.rerun()
     with nc2:
-        if st.button("All", key="mnav_all", use_container_width=True):
+        _t = "**All**" if view == ALL else "All"
+        if st.button(_t, key="mnav_all", use_container_width=True):
             st.session_state.nav_to = ALL
             st.rerun()
     with nc3:
+        # FAB — styled via CSS targeting this specific key
+        st.html("""
+<style>
+button[data-testid="stBaseButton-secondary"]:has(~ * [data-testid="stBaseButton-secondary"]:nth-child(2)) { display:none; }
+div[data-testid="column"]:nth-child(3) button {
+  background: linear-gradient(135deg, #5b6fff, #c44eba) !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 50% !important;
+  font-size: 1.3rem !important;
+  font-weight: 300 !important;
+  aspect-ratio: 1 !important;
+  box-shadow: 0 3px 14px rgba(91,111,255,.55) !important;
+  padding: 0 !important;
+}
+</style>
+""")
         if st.button("+", key="mnav_add", use_container_width=True):
             st.session_state.add_feed_open = not st.session_state.get("add_feed_open", False)
             st.rerun()
     with nc4:
-        if st.button("Calm", key="mnav_calm", use_container_width=True):
+        _t = "**Calm**" if view == CALM_VIEW else "Calm"
+        if st.button(_t, key="mnav_calm", use_container_width=True):
             st.session_state.nav_to = CALM_VIEW
             st.rerun()
     with nc5:
@@ -1392,35 +1394,57 @@ button[key="mnav_add"] {
             st.session_state["force_saved"] = True
             st.rerun()
 
-    # ── Add feed panel ──
+    # ── Feed management panel — opens when + is tapped ──
     if st.session_state.get("add_feed_open", False):
         with st.container(border=True):
-            st.markdown("**Add a feed**")
-            with st.form("mobile_add_feed", clear_on_submit=True):
-                m_name = st.text_input("Source name", placeholder="e.g. Tortoise")
-                m_url  = st.text_input("RSS URL", placeholder="https://…/feed")
-                fold_opts = list(feeds.keys()) + ["➕ New section…"]
-                m_fold = st.selectbox("Section", fold_opts)
-                m_new  = st.text_input("New section name") if m_fold == "➕ New section…" else ""
-                col_s, col_c = st.columns(2)
-                with col_s:
-                    submitted = st.form_submit_button("Add", use_container_width=True, type="primary")
-                with col_c:
-                    cancelled = st.form_submit_button("Cancel", use_container_width=True)
+            tab_a, tab_r = st.tabs(["➕ Add feed", "🗑 Remove feed"])
 
-                if submitted:
-                    folder = m_new.strip() if m_fold == "➕ New section…" else m_fold
-                    if m_name.strip() and m_url.strip() and folder:
-                        feeds.setdefault(folder, [])
-                        if not any(u == m_url.strip() for _, u in feeds[folder]):
-                            feeds[folder].append((m_name.strip(), m_url.strip()))
+            with tab_a:
+                with st.form("m_add_form", clear_on_submit=True):
+                    m_name = st.text_input("Source name", placeholder="e.g. Tortoise")
+                    m_url  = st.text_input("RSS URL",     placeholder="https://…/feed")
+                    fold_opts = list(feeds.keys()) + ["➕ New section…"]
+                    m_fold    = st.selectbox("Section", fold_opts)
+                    m_new     = st.text_input("New section name") if m_fold == "➕ New section…" else ""
+                    col_a, col_b = st.columns(2)
+                    with col_a:
+                        submitted = st.form_submit_button("Add", use_container_width=True, type="primary")
+                    with col_b:
+                        cancelled = st.form_submit_button("Cancel", use_container_width=True)
+                    if submitted:
+                        folder = m_new.strip() if m_fold == "➕ New section…" else m_fold
+                        if m_name.strip() and m_url.strip() and folder:
+                            feeds.setdefault(folder, [])
+                            if not any(u == m_url.strip() for _, u in feeds[folder]):
+                                feeds[folder].append((m_name.strip(), m_url.strip()))
+                                save_feeds(feeds, calm)
+                                fetch.clear()
+                            st.session_state.add_feed_open = False
+                            st.success(f"Added {m_name.strip()}")
+                            st.rerun()
+                        else:
+                            st.warning("Fill in all fields.")
+                    if cancelled:
+                        st.session_state.add_feed_open = False
+                        st.rerun()
+
+            with tab_r:
+                labels = [f"{fold} · {nm}" for fold, items in feeds.items() for nm, _ in items]
+                if labels:
+                    rm = st.selectbox("Feed to remove", labels, label_visibility="collapsed")
+                    col_c, col_d = st.columns(2)
+                    with col_c:
+                        if st.button("Remove", use_container_width=True, type="primary", key="m_rm"):
+                            rfold, rname = [x.strip() for x in rm.split("·", 1)]
+                            feeds[rfold] = [(n, u) for n, u in feeds[rfold] if n != rname]
+                            if not feeds[rfold]:
+                                del feeds[rfold]
                             save_feeds(feeds, calm)
                             fetch.clear()
-                        st.session_state.add_feed_open = False
-                        st.success(f"Added {m_name.strip()}")
-                        st.rerun()
-                    else:
-                        st.warning("Fill in all fields.")
-                if cancelled:
-                    st.session_state.add_feed_open = False
-                    st.rerun()
+                            st.rerun()
+                    with col_d:
+                        if st.button("Cancel", use_container_width=True, key="m_rm_cancel"):
+                            st.session_state.add_feed_open = False
+                            st.rerun()
+                else:
+                    st.caption("No feeds yet.")
