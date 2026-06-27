@@ -1319,132 +1319,108 @@ else:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Mobile top nav bar + add feed panel
+# Mobile top nav — real Streamlit buttons, always work
 # ─────────────────────────────────────────────────────────────────────────────
 if st.session_state.layout == "mobile":
 
-    # Handle incoming nav query param
-    _nav_param = st.query_params.get("nav", None)
-    if _nav_param:
-        _nav_map = {
-            "Today":    TODAY,
-            "All":      ALL,
-            "Calm":     CALM_VIEW,
-            "Saved":    None,
-            "add_feed": None,
-        }
-        if _nav_param == "add_feed":
-            st.session_state.add_feed_open = True
-        elif _nav_param in _nav_map and _nav_map[_nav_param]:
-            st.session_state.nav_to = _nav_map[_nav_param]
-        st.query_params.clear()
-        st.rerun()
-
-    _cur = view
-
-    def _nav_url(v):
-        return f"?nav={v}"
-
-    _ic_today = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>'
-    _ic_all   = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h10"/></svg>'
-    _ic_calm  = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 3"/></svg>'
-    _ic_saved = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 3h14a1 1 0 011 1v17l-8-4-8 4V4a1 1 0 011-1z"/></svg>'
-    _ic_plus  = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>'
-
-    def _nav_item(icon, label, nav_val, active=False):
-        color = "#fff" if active else "rgba(180,180,200,.55)"
-        return (
-            f'<a href="{_nav_url(nav_val)}" class="m-nav-btn" style="color:{color}" '
-            f'aria-label="{label}">{icon}<span>{label}</span></a>'
-        )
-
-    _today_active = _cur == TODAY
-    _all_active   = _cur == ALL
-    _calm_active  = _cur == CALM_VIEW
-
-    _nav_html = f"""
+    # Style the nav bar
+    st.html("""
 <style>
-/* ── Top nav bar ── */
-.m-nav-bar {{
-  position: fixed;
-  top: 0; left: 0; right: 0;
-  height: 58px;
+/* Sticky top bar wrapper */
+div[data-testid="stHorizontalBlock"]:has(button[key^="mnav_"]) {
+  position: sticky; top: 0; z-index: 999;
   background: rgba(12,15,26,.95);
-  backdrop-filter: blur(20px) saturate(160%);
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(20px);
   border-bottom: 1px solid rgba(255,255,255,.09);
-  z-index: 9999;
-  display: flex; align-items: center; justify-content: space-around;
-  padding: 0 6px;
-  padding-top: env(safe-area-inset-top);
-}}
-@media (prefers-color-scheme: light) {{
-  .m-nav-bar {{
+  padding: 6px 4px !important;
+  margin: -1rem -1rem .5rem !important;
+}
+@media (prefers-color-scheme: light) {
+  div[data-testid="stHorizontalBlock"]:has(button[key^="mnav_"]) {
     background: rgba(244,244,240,.97);
     border-bottom: 1px solid rgba(0,0,0,.08);
-  }}
-}}
-.m-nav-btn {{
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 2px; flex: 1; height: 100%;
-  text-decoration: none;
-  font-size: .53rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
-  -webkit-tap-highlight-color: transparent;
-  transition: color .12s;
-}}
-.m-nav-btn svg {{ width: 20px; height: 20px; }}
-.m-nav-fab {{
-  width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0;
-  background: linear-gradient(135deg, #5b6fff, #c44eba);
-  display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 3px 14px rgba(91,111,255,.55);
-  text-decoration: none;
-  -webkit-tap-highlight-color: transparent;
-  transition: transform .14s;
-}}
-.m-nav-fab:active {{ transform: scale(.91); }}
-.m-nav-fab svg {{ width: 20px; height: 20px; }}
-/* Push content below nav */
-[data-testid="stMainBlockContainer"] {{
-  padding-top: 72px !important;
-}}
+  }
+}
+/* Nav buttons */
+button[key^="mnav_"] {
+  border-radius: 10px !important;
+  border: none !important;
+  background: transparent !important;
+  color: rgba(180,180,200,.55) !important;
+  font-size: .58rem !important; font-weight: 700 !important;
+  letter-spacing: .05em !important; text-transform: uppercase !important;
+  padding: .3rem .1rem !important;
+  width: 100% !important;
+}
+button[key^="mnav_"]:hover {
+  background: rgba(255,255,255,.06) !important;
+  color: #fff !important;
+}
+/* FAB — plus button */
+button[key="mnav_add"] {
+  background: linear-gradient(135deg, #5b6fff, #c44eba) !important;
+  border-radius: 50% !important;
+  color: #fff !important;
+  font-size: 1.2rem !important;
+  padding: .2rem !important;
+  box-shadow: 0 3px 14px rgba(91,111,255,.55) !important;
+}
 </style>
-<div class="m-nav-bar">
-  {_nav_item(_ic_today, "Today", "Today", _today_active)}
-  {_nav_item(_ic_all,   "All",   "All",   _all_active)}
-  <a href="{_nav_url("add_feed")}" class="m-nav-fab" aria-label="Add feed">{_ic_plus}</a>
-  {_nav_item(_ic_calm,  "Calm",  "Calm",  _calm_active)}
-  {_nav_item(_ic_saved, "Saved", "Saved", False)}
-</div>
-"""
-    st.html(_nav_html)
+""")
 
-    # ── Add feed panel — opens when + is tapped ──
+    # Build nav columns: Today | All | + | Calm | Saved
+    nc1, nc2, nc3, nc4, nc5 = st.columns([1,1,.7,1,1], gap="small")
+
+    with nc1:
+        if st.button("Today", key="mnav_today", use_container_width=True):
+            st.session_state.nav_to = TODAY
+            st.rerun()
+    with nc2:
+        if st.button("All", key="mnav_all", use_container_width=True):
+            st.session_state.nav_to = ALL
+            st.rerun()
+    with nc3:
+        if st.button("+", key="mnav_add", use_container_width=True):
+            st.session_state.add_feed_open = not st.session_state.get("add_feed_open", False)
+            st.rerun()
+    with nc4:
+        if st.button("Calm", key="mnav_calm", use_container_width=True):
+            st.session_state.nav_to = CALM_VIEW
+            st.rerun()
+    with nc5:
+        if st.button("Saved", key="mnav_saved", use_container_width=True):
+            st.session_state["force_saved"] = True
+            st.rerun()
+
+    # ── Add feed panel ──
     if st.session_state.get("add_feed_open", False):
-        st.markdown("---")
-        st.markdown("### ➕ Add a feed")
+        with st.container(border=True):
+            st.markdown("**Add a feed**")
+            with st.form("mobile_add_feed", clear_on_submit=True):
+                m_name = st.text_input("Source name", placeholder="e.g. Tortoise")
+                m_url  = st.text_input("RSS URL", placeholder="https://…/feed")
+                fold_opts = list(feeds.keys()) + ["➕ New section…"]
+                m_fold = st.selectbox("Section", fold_opts)
+                m_new  = st.text_input("New section name") if m_fold == "➕ New section…" else ""
+                col_s, col_c = st.columns(2)
+                with col_s:
+                    submitted = st.form_submit_button("Add", use_container_width=True, type="primary")
+                with col_c:
+                    cancelled = st.form_submit_button("Cancel", use_container_width=True)
 
-        with st.form("mobile_add_feed"):
-            m_name = st.text_input("Source name", placeholder="e.g. Tortoise")
-            m_url  = st.text_input("RSS URL", placeholder="https://…/feed")
-            fold_opts = list(feeds.keys()) + ["➕ New section…"]
-            m_fold = st.selectbox("Section", fold_opts)
-            m_new  = st.text_input("New section name") if m_fold == "➕ New section…" else ""
-            submitted = st.form_submit_button("Add feed", use_container_width=True, type="primary")
-
-            if submitted:
-                folder = m_new.strip() if m_fold == "➕ New section…" else m_fold
-                if m_name.strip() and m_url.strip() and folder:
-                    feeds.setdefault(folder, [])
-                    if not any(u == m_url.strip() for _, u in feeds[folder]):
-                        feeds[folder].append((m_name.strip(), m_url.strip()))
-                        save_feeds(feeds, calm)
-                        fetch.clear()
+                if submitted:
+                    folder = m_new.strip() if m_fold == "➕ New section…" else m_fold
+                    if m_name.strip() and m_url.strip() and folder:
+                        feeds.setdefault(folder, [])
+                        if not any(u == m_url.strip() for _, u in feeds[folder]):
+                            feeds[folder].append((m_name.strip(), m_url.strip()))
+                            save_feeds(feeds, calm)
+                            fetch.clear()
+                        st.session_state.add_feed_open = False
+                        st.success(f"Added {m_name.strip()}")
+                        st.rerun()
+                    else:
+                        st.warning("Fill in all fields.")
+                if cancelled:
                     st.session_state.add_feed_open = False
                     st.rerun()
-                else:
-                    st.warning("Name, URL and section are required.")
-
-        if st.button("✕ Cancel", use_container_width=True):
-            st.session_state.add_feed_open = False
-            st.rerun()
