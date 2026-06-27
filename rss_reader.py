@@ -438,6 +438,20 @@ def diverse_section(articles, n=SECTION_SIZE, max_per=MAX_PER_SOURCE):
 st.set_page_config(page_title="Aurora", page_icon="✦", layout="wide",
                    initial_sidebar_state="expanded")
 
+# Hide Streamlit branding via config approach
+hide_st = """
+<style>
+[data-testid="stToolbar"],[data-testid="stDecoration"],
+[data-testid="stStatusWidget"],[data-testid="manage-app-button"],
+.viewerBadge_container__1QSob, .styles_viewerBadge__1yB5_,
+.viewerBadge_link__1S137, .viewerBadge_text__1JaDK,
+div[class*="viewerBadge"], div[class*="ToolbarActions"],
+button[title="View app fullscreen"],
+#stDecoration { display: none !important; }
+</style>
+"""
+st.html(hide_st)
+
 CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;500;600;700&display=swap');
@@ -468,6 +482,14 @@ CSS = """
 html,body,.stApp { background:var(--bg); font-family:var(--sans); color:var(--ink); }
 header[data-testid="stHeader"] { background:transparent; }
 #MainMenu,footer { display:none; }
+[data-testid="stToolbar"] { display:none !important; }
+[data-testid="stDecoration"] { display:none !important; }
+[data-testid="stStatusWidget"] { display:none !important; }
+.st-emotion-cache-h4xjwg { display:none !important; }
+iframe[title="streamlit_analytics"] { display:none !important; }
+/* Streamlit bottom bar / badges */
+div[class*="StatusWidget"] { display:none !important; }
+div[class*="AppDeployButton"] { display:none !important; }
 [data-testid="stAppViewContainer"],[data-testid="stMain"],
 [data-testid="stMainBlockContainer"] { background:transparent !important; }
 [data-testid="stMainBlockContainer"] { padding-top:1.4rem; max-width:1100px; }
